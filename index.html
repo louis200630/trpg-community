@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>密斯卡託尼克探險社 | CoC TRPG 現代預約管理系統</title>
+  
+  <!-- Google Fonts: Cinzel (神秘古典) & Noto Sans TC / Inter (現代高清晰度) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            void: '#09070f',
+            cardBg: '#120f1d',
+            cardHover: '#181427',
+            mystic: '#9d4edd',
+            mysticDark: '#3b185f',
+            copper: '#d4a373',
+            copperDark: '#8c5e32',
+            crimson: '#e11d48',
+            crimsonDark: '#881337',
+            parchment: '#f1ebd9',
+            mutedText: '#9f98af',
+          },
+          fontFamily: {
+            gothic: ['Cinzel', 'serif'],
+            sans: ['Inter', '"Noto Sans TC"', 'sans-serif'],
+          },
+          boxShadow: {
+            'modern-card': '0 10px 30px -10px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(157, 78, 221, 0.15)',
+            'modern-hover': '0 20px 35px -10px rgba(157, 78, 221, 0.25), 0 0 1px 1px rgba(212, 163, 115, 0.4)',
+            'glow-purple': '0 0 20px rgba(157, 78, 221, 0.35)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 & Babel CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      background-color: #09070f;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(59, 24, 95, 0.3) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(136, 19, 55, 0.2) 0px, transparent 50%);
+      color: #f1ebd9;
+      font-family: 'Inter', '"Noto Sans TC"', sans-serif;
+      min-height: 100vh;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #09070f;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #3b185f;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #d4a373;
+    }
+  </style>
+</head>
+<body class="custom-scrollbar selection:bg-mystic selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+    const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwaW52dWN1Z3hzeGpleW9wZXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3Njg0MDUsImV4cCI6MjEwNDM0NDQwNX0.nhwwJILYpXfAzBVuMZNCiwqUT1OwdtfjHPZGuwd82Uw';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // --- 核心資料庫 (Mock Data) ---
+    const INITIAL_EVENTS = [
+      {
+        id: 'evt-101',
+        title: '密斯卡託尼克古籍失竊案',
+        scenario_name: '狂氣之山的前奏 (CoC 7th)',
+        one_liner: '大學禁書區的《死靈之書》殘卷在暴雨夜消失，現場只留下腥臭黏液...',
+        location: '台北市大安區秘密聚會所 (近科技大樓站)',
+        event_date: '2026-09-08T19:30:00', // 小於36小時，測試鎖定退團
+        max_players: 4,
+        min_players: 2,
+        lock_hours: 36,
+        status: 'open',
+        keeper_name: 'Keeper 奈亞',
+        keeper_contact: 'LINE: @nyar_coc / 0912-345-678',
+        booked_investigators: [
+          { userId: 'u-01', charName: '艾琳·范德堡', occupation: '私家女偵探', san: 55, phone: '0911-222-333', lineId: 'irene_v' },
+          { userId: 'u-02', charName: '湯瑪斯·卡特', occupation: '戰地軍醫', san: 72, phone: '0922-333-444', lineId: 'doc_carter' },
+          { userId: 'u-03', charName: '莫林探員', occupation: '聯邦調查員', san: 60, phone: '0933-444-555', lineId: 'agent_m' }
+        ]
+      },
+      {
+        id: 'evt-102',
+        title: '暗夜呢喃：黑水沼澤的洗禮',
+        scenario_name: '印斯茅斯外傳篇章',
+        one_liner: '麻薩諸塞州外緣荒涼鹽沼多起旅人失蹤，泥濘深處隱約傳來沉悶的心跳聲。',
+        location: '新北市板橋地窖俱樂部 (實體面團)',
+        event_date: '2026-09-18T14:00:00',
+        max_players: 4,
+        min_players: 3,
+        lock_hours: 36,
+        status: 'open',
+        keeper_name: 'Keeper 奈亞',
+        keeper_contact: 'LINE: @nyar_coc',
+        booked_investigators: [
+          { userId: 'u-02', charName: '湯瑪斯·卡特', occupation: '戰地軍醫', san: 72, phone: '0922-333-444', lineId: 'doc_carter' }
+        ]
+      },
+      {
+        id: 'evt-103',
+        title: '皮克曼的模特兒：地下畫廊之夜',
+        scenario_name: '波士頓經典短篇改編',
+        one_liner: '天才畫家的畫作栩栩如生且極度駭人，直到他在暗門後銷聲匿跡。',
+        location: '線上 Discord 語音 + Roll20 沉浸地圖',
+        event_date: '2026-09-25T20:00:00',
+        max_players: 3,
+        min_players: 2,
+        lock_hours: 36,
+        status: 'open',
+        keeper_name: 'Keeper 奈亞',
+        keeper_contact: 'LINE: @nyar_coc',
+        booked_investigators: []
+      }
+    ];
+
+    const INITIAL_RECAPS = [
+      {
+        id: 'rec-1',
+        title: '沉落的印斯茅斯燈塔之役',
+        date: '2026-08-28',
+        tag: '經典逃脫',
+        summary: '軍醫精準投擲燃燒瓶封鎖旋轉階梯，調查員全員成功搭乘救生艇衝破潮汐逃脫。',
+        survivors: ['湯瑪斯 (軍醫)', '奧古斯特 (教授)'],
+        exp: 120,
+        image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        id: 'rec-2',
+        title: '阿卡姆古林地的深淵低語',
+        date: '2026-08-14',
+        tag: '狂亂震撼',
+        summary: '四人誤闖古林石陣，在黎明破曉前夕驅車衝出封鎖，但一人意識陷入永久創傷。',
+        survivors: ['艾琳 (偵探)', '諾曼 (記者)'],
+        exp: 100,
+        image: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80'
+      }
+    ];
+
+    const INITIAL_MY_CHARACTERS = [
+      {
+        id: 'char-1',
+        name: '奧古斯特·德雷斯',
+        occupation: '密大古典學教授',
+        san: 65,
+        maxSan: 99,
+        feature: '隨身攜帶古代羊皮卷殘本，對古符號極具狂熱',
+        isActive: true
+      },
+      {
+        id: 'char-2',
+        name: '「渡鴉」伊蓮娜',
+        occupation: '黑市古董掮客',
+        san: 35, // 危險值
+        maxSan: 85,
+        feature: '聽覺敏銳，常在夜雨下水道聽見細微抓撓聲',
+        isActive: false
+      }
+    ];
+
+    // --- 主程式進入點 ---
+    function App() {
+      // 抓取遠端場次範例
+      const { useState, useMemo, useEffect } = React;
+      
+      // 核心分頁: 'lobby' (跑團大廳) | 'archive' (檔案館與花絮) | 'portal' (會員專區)
+      const [currentTab, setCurrentTab] = useState('lobby');
+
+      // 使用者狀態與角色
+      const [userRole, setUserRole] = useState('member'); // 'member' | 'admin'
+      const [portalSubTab, setPortalSubTab] = useState('profile'); // 'profile' | 'keeper'
+      const [userExp, setUserExp] = useState(380);
+      const [currentUser, setCurrentUser] = useState(null);
+
+      // 資料集
+      const [events, setEvents] = useState([]);
+      const [isLoading, setIsLoading] = useState(true);
+      const [recaps, setRecaps] = useState(INITIAL_RECAPS);
+      const [characters, setCharacters] = useState(INITIAL_MY_CHARACTERS);
+
+      // 整合式單一互動彈窗 (同時顯示詳情、名單與報名)
+      const [activeEvent, setActiveEvent] = useState(null);
+      const [selectedCharId, setSelectedCharId] = useState(characters[0]?.id || '');
+      const [lockAlertMessage, setLockAlertMessage] = useState(null);
+
+      // 新增角色卡狀態 (簡化欄位)
+      const [showNewCharForm, setShowNewCharForm] = useState(false);
+      const [newChar, setNewChar] = useState({ name: '', occupation: '', san: 60, feature: '' });
+
+      // 當前登入調查員 ID
+      const CURRENT_USER_ID = 'my-user-id';
+
+      // --- 抓取遠端場次與報名名單 ---
+      useEffect(() => {
+        async function fetchEvents() {
+          try {
+            setIsLoading(true);
+            const { data, error } = await supabase
+              .from('events')
+              .select(`
+                *,
+                bookings (
+                  user_id,
+                  profiles ( display_name, phone, line_id ),
+                  characters ( name, occupation, san )
+                )
+              `)
+              .order('event_date', { ascending: true });
+
+            if (error) throw error;
+
+            if (data) {
+              // 將資料庫回傳的外鍵關聯格式，轉換為前端介面期待的 booked_investigators 陣列
+              const formatted = data.map(evt => ({
+                ...evt,
+                booked_investigators: (evt.bookings || []).map(b => ({
+                  userId: b.user_id,
+                  charName: b.characters?.name || '無名調查員',
+                  occupation: b.characters?.occupation || '神秘學者',
+                  san: b.characters?.san ?? 50,
+                  phone: b.profiles?.phone || '未填寫',
+                  lineId: b.profiles?.line_id || '未填寫'
+                }))
+              }));
+              setEvents(formatted);
+            }
+          } catch (err) {
+            console.error('讀取場次失敗：', err.message);
+          } finally {
+            setIsLoading(false);
+          }
+        }
+
+        fetchEvents();
+      }, []);
+
+      // 檢查是否已報名
+      const isBooked = (event) => event.booked_investigators.some(i => i.userId === CURRENT_USER_ID);
+
+      // 檢查是否在 36 小時鎖定退團視窗內
+      const checkIsLocked = (eventDateStr, lockHours = 36) => {
+        const eventTime = new Date(eventDateStr).getTime();
+        const now = new Date('2026-09-07T16:00:00').getTime(); // 當前系統時間
+        const diffHours = (eventTime - now) / (1000 * 60 * 60);
+        return diffHours > 0 && diffHours <= lockHours;
+      };
+
+      // 稱號計算
+      const levelTitle = useMemo(() => {
+        if (userExp >= 600) return '【傳奇】舊印持有者';
+        if (userExp >= 300) return '【老練】阿卡姆秘社常客';
+        return '【見習】初涉異變的調查員';
+      }, [userExp]);
+
+
+      // --- 報名資料寫入 (Supabase 實作) ---
+      const handleJoinEvent = async (eventId) => {
+        // 1. 確認當前登入者
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          alert('【需要調查員身分】請先登入系統後再簽署契約！');
+          return;
+        }
+
+        // 2. 取得欲出戰的角色卡
+        const char = characters.find(c => c.id === selectedCharId) || characters[0];
+        if (!char) {
+          alert('請先在會員頁籤登錄一張調查員角色卡！');
+          return;
+        }
+
+        // 3. 寫入 bookings 資料表
+        const { error } = await supabase
+          .from('bookings')
+          .insert({
+            event_id: eventId,
+            user_id: user.id,
+            character_id: char.id,
+            status: 'confirmed'
+          });
+
+        if (error) {
+          // 若命中 UNIQUE 限制或人數滿額觸發器
+          alert('報名未完成：' + error.message);
+          return;
+        }
+
+        alert('契約已成立！你已加入調查小隊。');
+        
+        // 4. 重新抓取資料更新畫面 (或觸發上面的 fetchEvents)
+        window.location.reload(); 
+      };
+
+
+      // --- 退團防呆操作 ---
+      const handleLeaveEvent = (evt) => {
+        if (checkIsLocked(evt.event_date, evt.lock_hours)) {
+          setLockAlertMessage(`開場前 ${evt.lock_hours} 小時已全面鎖定席位！避免整團流會，退團請直接私訊聯絡 Keeper（${evt.keeper_contact}）。`);
+          return;
+        }
+
+        setEvents(prev => prev.map(e => {
+          if (e.id === evt.id) {
+            return {
+              ...e,
+              booked_investigators: e.booked_investigators.filter(i => i.userId !== CURRENT_USER_ID)
+            };
+          }
+          return e;
+        }));
+
+        setActiveEvent(prev => ({
+          ...prev,
+          booked_investigators: prev.booked_investigators.filter(i => i.userId !== CURRENT_USER_ID)
+        }));
+      };
+
+      useEffect(() => {
+      // 1. 取得當前工作階段
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setCurrentUser(session?.user ?? null);
+      });
+
+      // 2. 監聽登入/登出狀態變化
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setCurrentUser(session?.user ?? null);
+      });
+
+      return () => subscription.unsubscribe();
+    }, []);
+
+    // 快速登入函式（以 Email + 密碼為例）
+    const handleLogin = async (email, password) => {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) alert('登入失敗：' + error.message);
+      else alert('歡迎歸來，調查員：' + data.user.email);
+    };
+
+    // 快速註冊函式
+    const handleSignUp = async (email, password, displayName) => {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: displayName } // 會透過之前的 handle_new_user 觸發器自動寫入 profiles
+        }
+      });
+      if (error) alert('註冊失敗：' + error.message);
+      else alert('註冊成功！');
+    };
+
+    // 登出函式
+    const handleLogout = async () => {
+      await supabase.auth.signOut();
+      alert('已登出系統。');
+    };
+
+      // --- 管理員操作：移除隊員 ---
+      const handleAdminKick = (eventId, userId) => {
+        setEvents(prev => prev.map(evt => {
+          if (evt.id === eventId) {
+            return {
+              ...evt,
+              booked_investigators: evt.booked_investigators.filter(i => i.userId !== userId)
+            };
+          }
+          return evt;
+        }));
+        if (activeEvent && activeEvent.id === eventId) {
+          setActiveEvent(prev => ({
+            ...prev,
+            booked_investigators: prev.booked_investigators.filter(i => i.userId !== userId)
+          }));
+        }
+      };
+
+      // --- 管理員操作：結算團務 ---
+      const handleAdminSettle = (eventId, exp = 100) => {
+        setUserExp(prev => prev + exp);
+        setEvents(prev => prev.map(e => e.id === eventId ? { ...e, status: 'completed' } : e));
+        alert(`結算完成！已發放 +${exp} EXP 給所有參與調查員。`);
+      };
+
+      // --- 新增角色卡 ---
+      const handleCreateChar = (e) => {
+        e.preventDefault();
+        if (!newChar.name || !newChar.occupation) return;
+        const created = {
+          id: `char-${Date.now()}`,
+          name: newChar.name,
+          occupation: newChar.occupation,
+          san: Number(newChar.san) || 50,
+          maxSan: 99,
+          feature: newChar.feature || '尚無特別紀錄',
+          isActive: false
+        };
+        setCharacters(prev => [...prev, created]);
+        setSelectedCharId(created.id);
+        setShowNewCharForm(false);
+        setNewChar({ name: '', occupation: '', san: 60, feature: '' });
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col justify-between text-parchment font-sans">
+          
+          {/* 頂部極簡現代導航 */}
+          <header className="sticky top-0 z-30 bg-void/85 backdrop-blur-xl border-b border-purple-900/30">
+            <div className="max-w-6xl mx-auto px-5 py-4 flex items-center justify-between">
+              
+              {/* Logo 與精神標語 */}
+              <div 
+                onClick={() => setCurrentTab('lobby')}
+                className="flex items-center gap-3 cursor-pointer group"
+              >
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-mystic to-purple-950 flex items-center justify-center text-xl shadow-glow-purple group-hover:scale-105 transition">
+                  ⍟
+                </div>
+                <div>
+                  <h1 className="font-gothic text-xl font-bold tracking-wider text-parchment flex items-center gap-2">
+                    MISKATONIC <span className="text-copper text-sm font-sans font-medium">密斯卡託尼克</span>
+                  </h1>
+                  <p className="text-xs text-mutedText tracking-widest">TRPG 預約與冒險管理</p>
+                </div>
+              </div>
+
+              {/* 導航 Tabs：只保留兩大主要入口 + 會員專區 */}
+              <nav className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentTab('lobby')}
+                  className={`px-4 py-2 rounded-xl text-base font-medium transition-all ${
+                    currentTab === 'lobby'
+                      ? 'bg-mysticDark/60 text-parchment border border-mystic/40 shadow-glow-purple'
+                      : 'text-mutedText hover:text-parchment hover:bg-white/5'
+                  }`}
+                >
+                  跑團大廳
+                </button>
+                <button
+                  onClick={() => setCurrentTab('archive')}
+                  className={`px-4 py-2 rounded-xl text-base font-medium transition-all ${
+                    currentTab === 'archive'
+                      ? 'bg-mysticDark/60 text-parchment border border-mystic/40 shadow-glow-purple'
+                      : 'text-mutedText hover:text-parchment hover:bg-white/5'
+                  }`}
+                >
+                  檔案館與花絮
+                </button>
+                <button
+                  onClick={() => setCurrentTab('portal')}
+                  className={`px-4 py-2 rounded-xl text-base font-medium transition-all flex items-center gap-2 ${
+                    currentTab === 'portal'
+                      ? 'bg-copper/20 text-copper border border-copper/50 shadow-glow-purple'
+                      : 'text-mutedText hover:text-copper hover:bg-white/5'
+                  }`}
+                >
+                  <span>🗂 會員專區</span>
+                  {userRole === 'admin' && (
+                    <span className="w-2 h-2 rounded-full bg-crimson animate-ping"></span>
+                  )}
+                </button>
+              </nav>
+
+            </div>
+          </header>
+
+          {/* 主要內容展示區 */}
+          <main className="max-w-6xl mx-auto px-5 py-10 flex-1 w-full">
+            
+            {/* ========================================================
+                分頁 1: 跑團大廳 (現代卡片流、言簡意賅、大字號)
+               ======================================================== */}
+            {currentTab === 'lobby' && (
+              <div className="space-y-8">
+                
+                {/* 氛圍 Banner */}
+                <div className="relative rounded-3xl bg-gradient-to-r from-cardBg via-[#1c152e] to-cardBg p-8 border border-purple-500/20 shadow-modern-card overflow-hidden">
+                  <div className="max-w-2xl space-y-3 relative z-10">
+                    <span className="text-xs uppercase tracking-widest text-copper bg-copper/10 px-3 py-1 rounded-full border border-copper/30">
+                      ★ 每週精選團務預約
+                    </span>
+                    <h2 className="text-3xl sm:text-4xl font-gothic font-bold text-parchment leading-tight">
+                      深淵正靜候勇敢的調查員。
+                    </h2>
+                    <p className="text-base text-mutedText leading-relaxed">
+                      點選任一卡片即可即時查看小隊名單並快速報名。每場活動出團前 36 小時將鎖定名單。
+                    </p>
+                  </div>
+                </div>
+
+                {/* 卡片網格 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {events.map((evt) => {
+                    const bookedNum = evt.booked_investigators.length;
+                    const isFull = bookedNum >= evt.max_players;
+                    const hasJoined = isBooked(evt);
+                    const locked = checkIsLocked(evt.event_date, evt.lock_hours);
+
+                    return (
+                      <div
+                        key={evt.id}
+                        onClick={() => { setActiveEvent(evt); setLockAlertMessage(null); }}
+                        className="group bg-cardBg hover:bg-cardHover rounded-3xl p-6 border border-purple-900/30 hover:border-copper/60 transition-all duration-300 cursor-pointer shadow-modern-card hover:shadow-modern-hover flex flex-col justify-between"
+                      >
+                        <div className="space-y-4">
+                          {/* 頂部標籤與狀態 */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-purple-950 text-purple-300 border border-purple-700/50">
+                              {evt.scenario_name}
+                            </span>
+                            {locked ? (
+                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-950/80 text-red-300 border border-red-800">
+                                🔒 鎖定中
+                              </span>
+                            ) : isFull ? (
+                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-900 text-stone-400">
+                                已額滿
+                              </span>
+                            ) : (
+                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+                                招募中
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 標題與一句話簡介 */}
+                          <div>
+                            <h3 className="text-xl font-bold text-parchment group-hover:text-copper transition">
+                              {evt.title}
+                            </h3>
+                            <p className="text-sm text-mutedText mt-2 line-clamp-2 leading-relaxed">
+                              {evt.one_liner}
+                            </p>
+                          </div>
+
+                          {/* 時間與地點（大字、簡潔） */}
+                          <div className="space-y-2 pt-2 border-t border-purple-950/40 text-sm">
+                            <div className="flex items-center gap-2 text-parchment">
+                              <span>📅</span>
+                              <span className="font-semibold">
+                                {new Date(evt.event_date).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric', weekday: 'short' })}
+                                {' '}
+                                {new Date(evt.event_date).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-mutedText truncate">
+                              <span>📍</span>
+                              <span className="truncate">{evt.location}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 人數進度條與點擊提示 */}
+                        <div className="mt-6 pt-4 border-t border-purple-950/50 space-y-2">
+                          <div className="flex justify-between text-xs font-medium">
+                            <span className="text-mutedText">小隊席位</span>
+                            <span className="text-copper font-bold">
+                              {bookedNum} / {evt.max_players} 人 ({bookedNum >= evt.min_players ? '已成團' : `差 ${evt.min_players - bookedNum} 人成團`})
+                            </span>
+                          </div>
+                          
+                          <div className="w-full bg-stone-900 h-2.5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all duration-500 ${
+                                isFull ? 'bg-crimson' : 'bg-gradient-to-r from-mystic to-copper'
+                              }`}
+                              style={{ width: `${(bookedNum / evt.max_players) * 100}%` }}
+                            ></div>
+                          </div>
+
+                          <div className="pt-2 flex justify-between items-center text-xs text-mutedText">
+                            {hasJoined ? (
+                              <span className="text-emerald-400 font-bold">✓ 你已在隊伍中</span>
+                            ) : (
+                              <span>點擊查看名單與報名 →</span>
+                            )}
+                            <span className="text-copper">主持: {evt.keeper_name}</span>
+                          </div>
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+
+              </div>
+            )}
+
+            {/* ========================================================
+                分頁 2: 檔案館與花絮 (關於我們 + 歷史團務回顧)
+               ======================================================== */}
+            {currentTab === 'archive' && (
+              <div className="space-y-10">
+                
+                {/* 關於我們區塊 */}
+                <div className="bg-cardBg rounded-3xl p-8 border border-purple-900/40 shadow-modern-card space-y-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🕯</span>
+                    <h2 className="text-2xl font-gothic font-bold text-parchment">關於密斯卡託尼克探險社</h2>
+                  </div>
+                  <p className="text-base text-mutedText leading-relaxed">
+                    我們是專注於《克蘇魯的呼喚》(Call of Cthulhu 7th) 的線下與線上跑團聚會。無論是初次涉足神秘領域的新手，或是渴望直視不可名狀恐懼的老練調查員，我們每週皆由資深守密人（Keeper）帶領，提供沉浸、具儀式感且節奏嚴謹的冒險體驗。
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-purple-950/50 text-sm">
+                    <div className="bg-black/40 p-4 rounded-2xl border border-purple-950">
+                      <strong className="text-copper block text-base mb-1">精緻小團</strong>
+                      <span className="text-mutedText">每團僅 2-4 人，確保每位調查員皆有充裕的發揮與推理解謎時間。</span>
+                    </div>
+                    <div className="bg-black/40 p-4 rounded-2xl border border-purple-950">
+                      <strong className="text-copper block text-base mb-1">誠信履約</strong>
+                      <span className="text-mutedText">開團前 36 小時鎖定名單，防止臨時放鳥確保全體玩家遊戲品質。</span>
+                    </div>
+                    <div className="bg-black/40 p-4 rounded-2xl border border-purple-950">
+                      <strong className="text-copper block text-base mb-1">歷程繼承</strong>
+                      <span className="text-mutedText">完團自動獲取 EXP，累積稱號並永久記錄角色生還傳奇。</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 歷史花絮清單 */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between border-b border-purple-900/40 pb-3">
+                    <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
+                      <span>📜</span> 歷史調查紀錄與花絮
+                    </h3>
+                    <span className="text-sm text-mutedText">共 {recaps.length} 份絕密檔案</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {recaps.map(r => (
+                      <div key={r.id} className="bg-cardBg rounded-3xl overflow-hidden border border-purple-900/30 shadow-modern-card flex flex-col">
+                        <div className="relative h-48 overflow-hidden">
+                          <img 
+                            src={r.image} 
+                            alt={r.title} 
+                            className="w-full h-full object-cover grayscale contrast-125 opacity-70 hover:scale-105 transition duration-500" 
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-cardBg via-transparent to-transparent"></div>
+                          <span className="absolute top-4 right-4 bg-black/70 text-copper text-xs px-3 py-1 rounded-full border border-copper/40">
+                            {r.date}
+                          </span>
+                        </div>
+                        <div className="p-6 space-y-3 flex-1 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800">
+                                {r.tag}
+                              </span>
+                              <h4 className="text-lg font-bold text-parchment">{r.title}</h4>
+                            </div>
+                            <p className="text-sm text-mutedText leading-relaxed italic mt-2">
+                              "{r.summary}"
+                            </p>
+                          </div>
+
+                          <div className="pt-4 border-t border-purple-950 flex items-center justify-between text-xs">
+                            <span className="text-emerald-400 font-medium">生還：{r.survivors.join('、')}</span>
+                            <span className="text-copper font-bold bg-copper/10 px-2.5 py-1 rounded-lg">+{r.exp} EXP</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ========================================================
+                分頁 3: 會員專區 (整合會員資料、角色卡設定與 Keeper 管理後台)
+               ======================================================== */}
+            {currentTab === 'portal' && (
+              <div className="space-y-8">
+                
+                {/* 頂部身分切換與帳號名片 */}
+                <div className="bg-cardBg rounded-3xl p-6 sm:p-8 border border-purple-900/40 shadow-modern-card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-copper to-amber-800 flex items-center justify-center text-3xl shadow-glow-purple">
+                      🕵️‍♂️
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold text-parchment">調查員代號 #Arkham-709</h2>
+                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          {userRole === 'admin' ? 'Keeper 守密人' : '已認證調查員'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-copper mt-0.5 font-medium">{levelTitle} • 累積 {userExp} EXP</p>
+                      <p className="text-xs text-mutedText mt-1">聯絡通訊：LINE: @investigator_me | 手機: 0988-777-666</p>
+                    </div>
+                  </div>
+
+                  {/* 切換視角 (會員 vs 管理員) */}
+                  <div className="flex items-center gap-2 bg-void p-1.5 rounded-2xl border border-purple-900/50">
+                    <button
+                      onClick={() => { setUserRole('member'); setPortalSubTab('profile'); }}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+                        userRole === 'member' ? 'bg-mystic text-white font-bold' : 'text-mutedText hover:text-white'
+                      }`}
+                    >
+                      會員視角 (我的手帳)
+                    </button>
+                    <button
+                      onClick={() => { setUserRole('admin'); setPortalSubTab('keeper'); }}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+                        userRole === 'admin' ? 'bg-crimson text-white font-bold shadow-glow-purple' : 'text-mutedText hover:text-white'
+                      }`}
+                    >
+                      ⚡ Keeper 管理員後台
+                    </button>
+                  </div>
+                </div>
+
+                {/* 視角 A: 一般會員 (跑團紀錄 + 角色卡設定) */}
+                {userRole === 'member' && (
+                  <div className="space-y-8">
+                    
+                    {/* 1. 角色卡管理 (簡化欄位：姓名、職業、SAN值、一句話特徵) */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-purple-900/40 pb-3">
+                        <div>
+                          <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
+                            <span>📋</span> 我的調查員角色卡 ({characters.length} 張)
+                          </h3>
+                          <p className="text-xs text-mutedText mt-1">報名時將預設攜帶「出戰中」的角色，亦可在報名視窗自由選擇。</p>
+                        </div>
+                        <button
+                          onClick={() => setShowNewCharForm(true)}
+                          className="px-4 py-2 bg-mystic hover:bg-purple-600 text-white rounded-xl text-sm font-bold shadow-glow-purple transition"
+                        >
+                          + 快速建立新卡
+                        </button>
+                      </div>
+
+                      {/* 建立角色卡表單 (簡化版) */}
+                      {showNewCharForm && (
+                        <form onSubmit={handleCreateChar} className="bg-void p-6 rounded-3xl border border-mystic/40 space-y-4">
+                          <h4 className="text-base font-bold text-copper">登錄簡易調查員檔案</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <label className="block text-xs text-mutedText mb-1">姓名 *</label>
+                              <input
+                                required
+                                type="text"
+                                placeholder="例：亨利·摩根"
+                                value={newChar.name}
+                                onChange={e => setNewChar({...newChar, name: e.target.value})}
+                                className="w-full bg-cardBg border border-purple-900 rounded-xl p-2.5 text-parchment text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-mutedText mb-1">職業 *</label>
+                              <input
+                                required
+                                type="text"
+                                placeholder="例：私家偵探 / 戰地記者"
+                                value={newChar.occupation}
+                                onChange={e => setNewChar({...newChar, occupation: e.target.value})}
+                                className="w-full bg-cardBg border border-purple-900 rounded-xl p-2.5 text-parchment text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-mutedText mb-1">理智值 (SAN: 1~99)</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="99"
+                                value={newChar.san}
+                                onChange={e => setNewChar({...newChar, san: e.target.value})}
+                                className="w-full bg-cardBg border border-purple-900 rounded-xl p-2.5 text-parchment text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-mutedText mb-1">一句話背景或特殊信物</label>
+                            <input
+                              type="text"
+                              placeholder="例：總是隨身攜帶一把斑駁的銀製懷錶，經常做關於大海的噩夢..."
+                              value={newChar.feature}
+                              onChange={e => setNewChar({...newChar, feature: e.target.value})}
+                              className="w-full bg-cardBg border border-purple-900 rounded-xl p-2.5 text-parchment text-sm"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowNewCharForm(false)}
+                              className="px-4 py-2 text-sm text-mutedText hover:text-white"
+                            >
+                              取消
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-5 py-2 bg-copper hover:bg-copperDark text-black font-bold rounded-xl text-sm transition"
+                            >
+                              儲存卡片
+                            </button>
+                          </div>
+                        </form>
+                      )}
+
+                      {/* 角色卡列表 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {characters.map(c => (
+                          <div 
+                            key={c.id}
+                            className={`p-5 rounded-2xl border transition-all ${
+                              c.isActive ? 'bg-cardHover border-copper shadow-glow-purple' : 'bg-cardBg border-purple-950'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="text-lg font-bold text-parchment">{c.name}</h4>
+                                <span className="text-xs text-copper font-medium">{c.occupation}</span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setCharacters(prev => prev.map(item => ({ ...item, isActive: item.id === c.id })));
+                                  setSelectedCharId(c.id);
+                                }}
+                                className={`text-xs px-3 py-1 rounded-xl font-bold transition ${
+                                  c.isActive ? 'bg-copper text-black' : 'bg-void text-mutedText hover:text-white border border-purple-900'
+                                }`}
+                              >
+                                {c.isActive ? '✓ 出戰中' : '設為出戰'}
+                              </button>
+                            </div>
+
+                            {/* SAN 條 */}
+                            <div className="mt-3 space-y-1.5">
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span className="text-mutedText">理智值 (SAN)</span>
+                                <span className={c.san < 40 ? 'text-red-400 animate-pulse font-bold' : 'text-emerald-400'}>
+                                  {c.san} / {c.maxSan} {c.san < 40 && '【瀕臨瘋狂】'}
+                                </span>
+                              </div>
+                              <div className="w-full bg-stone-900 h-2 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${c.san < 40 ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                  style={{ width: `${(c.san / c.maxSan) * 100}%` }}
+                                ></div>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-mutedText mt-3 bg-void/60 p-3 rounded-xl border border-purple-950/60 leading-relaxed">
+                              {c.feature}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 2. 我的跑團歷史清單 */}
+                    <div className="space-y-4">
+                      <h3 className="text-xl font-bold text-parchment border-b border-purple-900/40 pb-3 flex items-center gap-2">
+                        <span>⛺</span> 我的預約與出團記錄
+                      </h3>
+                      <div className="space-y-3">
+                        {events.filter(e => isBooked(e)).length === 0 ? (
+                          <div className="bg-cardBg p-6 rounded-2xl text-center text-mutedText text-sm border border-purple-950">
+                            你目前尚未報名任何調查任務，歡迎前往「跑團大廳」挑選合適場次！
+                          </div>
+                        ) : (
+                          events.filter(e => isBooked(e)).map(e => (
+                            <div key={e.id} className="bg-cardBg p-5 rounded-2xl border border-purple-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                              <div>
+                                <span className="text-xs text-copper bg-copper/10 px-2.5 py-0.5 rounded-md border border-copper/30 font-medium">
+                                  {e.scenario_name}
+                                </span>
+                                <h4 className="text-lg font-bold text-parchment mt-1">{e.title}</h4>
+                                <p className="text-xs text-mutedText mt-1">
+                                  📅 {new Date(e.event_date).toLocaleString('zh-TW')} | 📍 {e.location}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => { setActiveEvent(e); setLockAlertMessage(null); }}
+                                className="px-4 py-2 bg-void hover:bg-cardHover border border-purple-800 text-sm font-medium text-parchment rounded-xl transition"
+                              >
+                                查看小隊名冊
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
+                {/* 視角 B: 管理員專用 (Keeper 後台管理) */}
+                {userRole === 'admin' && (
+                  <div className="space-y-6">
+                    
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-purple-900/40 pb-3">
+                      <div>
+                        <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
+                          <span className="text-crimson">⚡</span> Keeper 團務管理台
+                        </h3>
+                        <p className="text-xs text-mutedText mt-1">輕鬆檢視每場報名者通訊、踢除不適任玩家或一鍵發放結算 EXP。</p>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const title = prompt('請輸入新場次標題：', '深入達維奇村的黑夜狂嘯');
+                          if (title) {
+                            const newEvt = {
+                              id: `evt-${Date.now()}`,
+                              title,
+                              scenario_name: '原創新模組',
+                              one_liner: '偏遠古村傳來山丘轟鳴，當地警長請求阿卡姆學者緊急支援。',
+                              location: '台北市大安區 TRPG 秘密聚會所',
+                              event_date: '2026-10-02T19:30:00',
+                              max_players: 4,
+                              min_players: 2,
+                              lock_hours: 36,
+                              status: 'open',
+                              keeper_name: 'Keeper 奈亞',
+                              keeper_contact: 'LINE: @nyar_coc',
+                              booked_investigators: []
+                            };
+                            setEvents(prev => [newEvt, ...prev]);
+                            alert('新場次已成功建立發布至大廳！');
+                          }
+                        }}
+                        className="px-4 py-2 bg-crimson hover:bg-crimsonDark text-white rounded-xl text-sm font-bold shadow-glow-purple transition"
+                      >
+                        + 快速發布新團務場次
+                      </button>
+                    </div>
+
+                    {/* 場次與名冊管理 */}
+                    <div className="space-y-6">
+                      {events.map(evt => (
+                        <div key={evt.id} className="bg-cardBg rounded-3xl p-6 border border-purple-900/40 space-y-4">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-purple-950">
+                            <div>
+                              <h4 className="text-lg font-bold text-parchment">{evt.title}</h4>
+                              <p className="text-xs text-mutedText mt-0.5">
+                                時間：{new Date(evt.event_date).toLocaleString()} | 地點：{evt.location}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {evt.status !== 'completed' && (
+                                <button
+                                  onClick={() => handleAdminSettle(evt.id, 120)}
+                                  className="px-3.5 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-600 text-emerald-300 rounded-xl text-xs font-bold transition"
+                                >
+                                  ⚡ 一鍵結算 (+120 EXP)
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  if (confirm('確定要取消這場活動嗎？')) {
+                                    setEvents(prev => prev.filter(e => e.id !== evt.id));
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-stone-900 hover:bg-red-950 text-stone-400 hover:text-red-300 rounded-xl text-xs transition"
+                              >
+                                關閉場次
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 報名者聯絡清單 (Keeper 專屬隱私檢視) */}
+                          <div className="space-y-2">
+                            <span className="text-xs font-semibold text-copper block">
+                              報名調查員清單 ({evt.booked_investigators.length} / {evt.max_players} 人)：
+                            </span>
+
+                            {evt.booked_investigators.length === 0 ? (
+                              <div className="text-xs text-mutedText py-2 italic">尚無調查員加入。</div>
+                            ) : (
+                              <div className="divide-y divide-purple-950 border border-purple-950 rounded-2xl overflow-hidden bg-void/50">
+                                {evt.booked_investigators.map(inv => (
+                                  <div key={inv.userId} className="p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                                    <div>
+                                      <span className="text-sm font-bold text-parchment">{inv.charName}</span>
+                                      <span className="text-copper ml-2">({inv.occupation} • SAN: {inv.san})</span>
+                                      <div className="text-mutedText mt-1 flex gap-3">
+                                        <span>LINE: <strong className="text-emerald-400">{inv.lineId}</strong></span>
+                                        <span>手機: <strong className="text-amber-400">{inv.phone}</strong></span>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => handleAdminKick(evt.id, inv.userId)}
+                                      className="px-3 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 rounded-lg text-xs transition border border-red-900/60"
+                                    >
+                                      踢出隊伍
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                  </div>
+                )}
+
+              </div>
+            )}
+
+          </main>
+
+          {/* ========================================================
+              整合式單一彈窗：活動資訊 + 小隊名冊 + 一鍵報名 (減少跳轉)
+             ======================================================== */}
+          {activeEvent && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="bg-cardBg border border-copper/50 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+                
+                {/* 彈窗標題與關閉按鈕 */}
+                <div className="flex justify-between items-start border-b border-purple-950 pb-4">
+                  <div>
+                    <span className="text-xs font-semibold px-3 py-1 rounded-full bg-purple-950 text-purple-300 border border-purple-700/50">
+                      {activeEvent.scenario_name}
+                    </span>
+                    <h3 className="text-2xl font-bold text-parchment mt-2">{activeEvent.title}</h3>
+                  </div>
+                  <button 
+                    onClick={() => setActiveEvent(null)}
+                    className="w-8 h-8 rounded-full bg-void flex items-center justify-center text-mutedText hover:text-white transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* 1. 簡要資訊 (言簡意賅) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-void p-4 rounded-2xl border border-purple-950">
+                  <div className="space-y-1.5">
+                    <div className="text-mutedText">📅 開團時間：</div>
+                    <div className="font-semibold text-parchment">
+                      {new Date(activeEvent.event_date).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="text-mutedText">📍 集合地點：</div>
+                    <div className="font-semibold text-parchment">{activeEvent.location}</div>
+                  </div>
+                  <div className="sm:col-span-2 pt-2 border-t border-purple-950/60 text-mutedText text-xs leading-relaxed">
+                    💡 簡介導讀：{activeEvent.one_liner}
+                  </div>
+                </div>
+
+                {/* 2. 小隊名冊共同顯示區 (已報名調查員) */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-base font-bold text-copper flex items-center gap-2">
+                      <span>👥</span> 調查小隊成員名冊 ({activeEvent.booked_investigators.length} / {activeEvent.max_players})
+                    </h4>
+                    <span className="text-xs text-mutedText">
+                      {activeEvent.booked_investigators.length >= activeEvent.min_players ? '✓ 已達最低成團人數' : `尚需 ${activeEvent.min_players - activeEvent.booked_investigators.length} 人成團`}
+                    </span>
+                  </div>
+
+                  {activeEvent.booked_investigators.length === 0 ? (
+                    <div className="p-4 rounded-2xl bg-void/50 border border-dashed border-purple-950 text-center text-sm text-mutedText">
+                      小隊目前尚無成員，成為第一位踏入迷霧的調查員吧！
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {activeEvent.booked_investigators.map((inv, idx) => (
+                        <div key={idx} className="p-3.5 rounded-2xl bg-void border border-purple-900/60 flex items-center justify-between text-xs">
+                          <div>
+                            <span className="font-bold text-parchment text-sm block">{inv.charName}</span>
+                            <span className="text-mutedText">{inv.occupation}</span>
+                          </div>
+                          <span className="text-emerald-400 font-mono font-bold bg-emerald-950/80 px-2 py-1 rounded-lg border border-emerald-800">
+                            SAN: {inv.san}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. 防跳車警告提示 (若點擊退出觸發) */}
+                {lockAlertMessage && (
+                  <div className="p-4 bg-red-950/60 border border-red-600 rounded-2xl text-xs text-red-200 leading-relaxed animate-pulse">
+                    ⚠️ {lockAlertMessage}
+                  </div>
+                )}
+
+                {/* 4. 報名與行動區塊 (完全不用切換頁面) */}
+                <div className="pt-4 border-t border-purple-950 space-y-4">
+                  {isBooked(activeEvent) ? (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-emerald-950/30 p-4 rounded-2xl border border-emerald-900">
+                      <span className="text-sm text-emerald-300 font-semibold">✓ 你已簽署契約並成功加入本場調查小隊</span>
+                      <button
+                        onClick={() => handleLeaveEvent(activeEvent)}
+                        className="px-4 py-2 bg-red-950 hover:bg-red-900 text-red-300 border border-red-700 rounded-xl text-xs font-bold transition"
+                      >
+                        退出本次調查
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <label className="text-sm text-copper font-medium whitespace-nowrap">選擇指派角色卡：</label>
+                        <select
+                          value={selectedCharId}
+                          onChange={(e) => setSelectedCharId(e.target.value)}
+                          className="w-full bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                        >
+                          {characters.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} ({c.occupation}) - SAN: {c.san}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          onClick={() => setActiveEvent(null)}
+                          className="px-4 py-2.5 text-sm text-mutedText hover:text-white"
+                        >
+                          返回
+                        </button>
+                        <button
+                          disabled={activeEvent.booked_investigators.length >= activeEvent.max_players}
+                          onClick={() => handleJoinEvent(activeEvent.id)}
+                          className={`px-6 py-2.5 rounded-xl text-sm font-bold transition shadow-glow-purple ${
+                            activeEvent.booked_investigators.length >= activeEvent.max_players
+                              ? 'bg-stone-900 text-stone-600 cursor-not-allowed'
+                              : 'bg-copper hover:bg-copperDark text-black'
+                          }`}
+                        >
+                          {activeEvent.booked_investigators.length >= activeEvent.max_players ? '席位已額滿' : '一鍵確認報名'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* 頁尾 */}
+          <footer className="border-t border-purple-900/30 bg-void/90 py-6 text-center text-xs text-mutedText">
+            <div className="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span className="font-gothic tracking-wider text-parchment">
+                MISKATONIC ARCHIVES • CALL OF CTHULHU 7TH ED.
+              </span>
+              <span>
+                每週一團 • 沉浸式 TRPG 預約管理系統
+              </span>
+            </div>
+          </footer>
+
+        </div>
+      );
+    }
+
+    // 掛載 React
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
