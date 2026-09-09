@@ -171,7 +171,6 @@
       const [currentUser, setCurrentUser] = useState(null);
       const [profile, setProfile] = useState(null);
       const [accountRole, setAccountRole] = useState('member');
-      const [userExp, setUserExp] = useState(0);
       const [portalView, setPortalView] = useState('member');
 
       // 資料集
@@ -179,6 +178,8 @@
       const [characters, setCharacters] = useState([]);
       const [recaps, setRecaps] = useState([]);
       const [isUsingMock, setIsUsingMock] = useState(false);
+      const [settlingEvent, setSettlingEvent] = useState(null);
+      const [growthNotes, setGrowthNotes] = useState({});
 
       // 互動視窗狀態
       const [activeEvent, setActiveEvent] = useState(null);
@@ -254,7 +255,6 @@
         if (!supabaseClient || !user) {
           setProfile(null);
           setAccountRole('member');
-          setUserExp(0);
           setPortalView('member');
           return;
         }
@@ -268,8 +268,6 @@
               display_name,
               phone,
               line_id,
-              exp,
-              title,
               role
             `)
             .eq('id', user.id)
@@ -289,18 +287,12 @@
               ? 'admin'
               : 'member'
           );
-
-          setUserExp(
-            Number(data?.exp) || 0
-          );
-
         } catch (error) {
 
           console.error( '❌ Profile 讀取失敗:',error);
 
           setProfile(null);
           setAccountRole('member');
-          setUserExp(0);
           setPortalView('member');
         }
       };
@@ -320,7 +312,6 @@
 
           setProfile(null);
           setAccountRole('member');
-          setUserExp(0);
           setPortalView('member');
 
           // 登出後一定要清空上一個人的角色卡
@@ -343,6 +334,8 @@
             *,
             bookings(
               user_id,
+              character_id,
+              status,
               characters(
                 name,
                 occupation,
@@ -357,7 +350,12 @@
           const formattedEvts = evts.map(evt => ({
             ...evt,
             booked_investigators: (evt.bookings || []).map(b => ({
-              userId: b.user_id, charName: b.characters?.name || '無名', occupation: b.characters?.occupation, san: b.characters?.san
+              userId: b.user_id,
+              characterId: b.character_id,
+              charName: b.characters?.name || '無名',
+              occupation: b.characters?.occupation,
+              san: b.characters?.san,
+              status: b.status
             }))
           }));
           setEvents(formattedEvts);
@@ -383,13 +381,6 @@
         setSelectedCharId(MOCK_CHARS[0].id);
         setIsUsingMock(true);
       };
-
-      // 稱號等級計算
-      const levelTitle = useMemo(() => {
-        if (userExp >= 600) return '【傳奇】舊印持有者';
-        if (userExp >= 300) return '【老練】阿卡姆秘社常客';
-        return '【見習】初涉異變的調查員';
-      }, [userExp]);
 
       // 輔助判斷
       const isBooked = (evt) => {
@@ -803,12 +794,46 @@
         }
       };
 
-      // 發放經驗
-      const handleAdminSettle = (eventId, exp = 100) => {
-        setUserExp(prev => prev + exp);
-        setEvents(prev => prev.map(e => e.id === eventId ? { ...e, status: 'completed' } : e));
-        showToast(`結算完成！已向小隊發放 +${exp} EXP。`, 'success');
+      // 團務結算
+      const handleOpenSettlement = (evt) => {
+        if ( new Date(evt.event_date).getTime() > Date.now()) { return showToast( '團務尚未開始，無法結算。','error');}
+        const initialNotes = {};
+        evt.booked_investigators.forEach(inv => { initialNotes[inv.characterId] = '';});
+        setGrowthNotes(initialNotes);
+        setSettlingEvent(evt);
       };
+
+      const handleSettleEvent = async (e) => {
+        e.preventDefault();
+        if (!settlingEvent) return;
+
+        const growths =
+          settlingEvent.booked_investigators.map(
+            inv => ({
+              character_id: inv.characterId,
+              growth_note: (growthNotes[inv.characterId] || '').trim()
+            })
+          );
+
+        if ( growths.some( item => !item.growth_note) ) { return showToast('請替每位參團角色填寫成長紀錄。','error');}
+
+        const { data, error } =
+          await supabaseClient.rpc(
+            'settle_event',
+            {
+              p_event_id: settlingEvent.id,
+              p_growths: growths
+            }
+          );
+        console.log('📜 團務結算:',data,error);
+
+        if (error) { return showToast('結算失敗：' + error.message,'error');}
+        setSettlingEvent(null);
+        setGrowthNotes({});
+        await fetchAllData();
+        showToast('團務結算完成，角色成長紀錄已發放。','success' );
+      };
+
 
       return (
         <div className="min-h-screen flex flex-col justify-between text-parchment font-sans">
@@ -1085,7 +1110,7 @@
                           {accountRole === 'admin' ? 'Keeper 守密人' : '已認證調查員'}
                         </span>
                       </div>
-                      <p className="text-sm text-copper mt-0.5 font-medium">{levelTitle} • 累積 {userExp} EXP</p>
+                      <p className="text-sm text-copper mt-0.5 font-medium">{accountRole === 'admin' ? 'Keeper 守密人' : 'Miskatonic 認證調查員'}</p>
                       <p className="text-xs text-mutedText mt-1">
                         狀態：{currentUser ? `登入帳號: ${currentUser.email}` : '未登入 (可隨時點擊右上角登入)'}
                       </p>
@@ -1337,8 +1362,8 @@
                                 {isEventChangeLocked( evt.event_date,evt.lock_hours ) ? '🔒 團務已鎖定' : '✏️ 修改團務'}
                               </button>
                               {evt.status !== 'completed' && (
-                                <button onClick={() => handleAdminSettle(evt.id, 120)} className="px-3.5 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-600 text-emerald-300 rounded-xl text-xs font-bold transition">
-                                  ⚡ 一鍵結算 (+120 EXP)
+                                <button onClick={() => handleOpenSettlement(evt)} className="px-3.5 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-600 text-emerald-300 rounded-xl text-xs font-bold transition">
+                                  📜 團務結算
                                 </button>
                               )}
                               <button onClick={() => handleAdminDeleteEvent(evt.id)} className="px-3 py-1.5 bg-stone-900 hover:bg-red-950 text-stone-400 hover:text-red-300 rounded-xl text-xs transition">
