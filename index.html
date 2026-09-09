@@ -14,7 +14,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   
   <!-- Supabase JS Client (僅載入一次) -->
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- React 18 & Babel CDN -->
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
@@ -27,17 +27,11 @@
       theme: {
         extend: {
           colors: {
-            void: '#09070f',
-            cardBg: '#120f1d',
-            cardHover: '#181427',
-            mystic: '#9d4edd',
-            mysticDark: '#3b185f',
-            copper: '#d4a373',
-            copperDark: '#8c5e32',
-            crimson: '#e11d48',
-            crimsonDark: '#881337',
-            parchment: '#f1ebd9',
-            mutedText: '#9f98af',
+            void: '#09070f', cardBg: '#120f1d', cardHover: '#181427',
+            mystic: '#9d4edd', mysticDark: '#3b185f',
+            copper: '#d4a373', copperDark: '#8c5e32',
+            crimson: '#e11d48', crimsonDark: '#881337',
+            parchment: '#f1ebd9', mutedText: '#9f98af',
           },
           fontFamily: {
             gothic: ['Cinzel', 'serif'],
@@ -63,19 +57,17 @@
       font-family: 'Inter', '"Noto Sans TC"', sans-serif;
       min-height: 100vh;
     }
-    .custom-scrollbar::-webkit-scrollbar {
-      width: 6px;
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #09070f; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #3b185f; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d4a373; }
+
+    /* Toast Animation */
+    @keyframes slideInUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
-    .custom-scrollbar::-webkit-scrollbar-track {
-      background: #09070f;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #3b185f;
-      border-radius: 4px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: #d4a373;
-    }
+    .animate-toast { animation: slideInUp 0.3s ease-out forwards; }
   </style>
 </head>
 <body class="custom-scrollbar selection:bg-mystic selection:text-white">
@@ -84,72 +76,49 @@
   <script type="text/babel">
     const { useState, useMemo, useEffect } = React;
 
-    // 修正：依據您的 JWT 提取之真實專案 ID (kpinvucugxsxjeyopezn) 自動拼接正確 URL
+    // 1. Supabase 初始化與連線設定
     const SUPABASE_URL = 'https://kpinvucugxsxjeyopezn.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwaW52dWN1Z3hzeGpleW9wZXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3Njg0MDUsImV4cCI6MjEwNDM0NDQwNX0.nhwwJILYpXfAzBVuMZNCiwqUT1OwdtfjHPZGuwd82Uw';
     
-    // 初始化 Supabase 實例（防止離線時崩潰）
-    let supabase = null;
+    // 安全初始化：避免離線時網頁直接崩潰
+    let supabaseClient = null;
+
     try {
-      if (window.supabase) {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      }
-    } catch (e) {
-      console.warn('Supabase 初始化提示：', e.message);
+      console.log('Supabase library:', window.supabase);
+      if (!window.supabase) { throw new Error('Supabase JS CDN 載入失敗'); }
+
+      supabaseClient = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+      );
+      console.log('✅ Supabase Client 建立成功:', supabaseClient);
+    } catch (error) {
+      console.error('❌ Supabase 初始化失敗:', error);
     }
 
-    const INITIAL_EVENTS = [
+    // 2. 備用展示資料 (Mock Data) - 當資料庫為空時顯示
+    const MOCK_EVENTS = [
       {
-        id: 'evt-101',
-        title: '密斯卡託尼克古籍失竊案',
-        scenario_name: '狂氣之山的前奏 (CoC 7th)',
-        one_liner: '大學禁書區的《死靈之書》殘卷在暴雨夜消失，現場只留下腥臭黏液...',
-        location: '台北市大安區秘密聚會所 (近科技大樓站)',
-        event_date: '2026-09-08T19:30:00',
-        max_players: 4,
-        min_players: 2,
-        lock_hours: 36,
-        status: 'open',
-        keeper_name: 'Keeper 奈亞',
-        keeper_contact: 'LINE: @nyar_coc / 0912-345-678',
+        id: 'evt-101', title: '密斯卡託尼克古籍失竊案', scenario_name: '狂氣之山的前奏',
+        one_liner: '大學禁書區的《死靈之書》殘卷在暴雨夜消失...',
+        location: '台北市大安區秘密聚會所', event_date: '2026-09-08T19:30:00',
+        max_players: 4, min_players: 1, lock_hours: 36, status: 'open', keeper_name: 'Keeper 奈亞',
         booked_investigators: [
-          { userId: 'u-01', charName: '艾琳·范德堡', occupation: '私家女偵探', san: 55, phone: '0911-222-333', lineId: 'irene_v' },
-          { userId: 'u-02', charName: '湯瑪斯·卡特', occupation: '戰地軍醫', san: 72, phone: '0922-333-444', lineId: 'doc_carter' }
+          { userId: 'u-1', charName: '艾琳', occupation: '偵探', san: 55 },
+          { userId: 'u-2', charName: '湯瑪斯', occupation: '軍醫', san: 72 }
         ]
       },
       {
-        id: 'evt-102',
-        title: '暗夜呢喃：黑水沼澤的洗禮',
-        scenario_name: '印斯茅斯外傳篇章',
+        id: 'evt-102', title: '暗夜呢喃：黑水沼澤的洗禮', scenario_name: '印斯茅斯外傳篇章',
         one_liner: '麻薩諸塞州外緣荒涼鹽沼多起旅人失蹤，泥濘深處隱約傳來沉悶的心跳聲。',
-        location: '新北市板橋地窖俱樂部 (實體面團)',
-        event_date: '2026-09-18T14:00:00',
-        max_players: 4,
-        min_players: 3,
-        lock_hours: 36,
-        status: 'open',
-        keeper_name: 'Keeper 奈亞',
-        keeper_contact: 'LINE: @nyar_coc',
+        location: '新北市板橋地窖俱樂部 (實體面團)', event_date: '2026-09-18T14:00:00',
+        max_players: 4, min_players: 3, lock_hours: 36, status: 'open', keeper_name: 'Keeper 奈亞',
         booked_investigators: [
-          { userId: 'u-02', charName: '湯瑪斯·卡特', occupation: '戰地軍醫', san: 72, phone: '0922-333-444', lineId: 'doc_carter' }
+          { userId: 'u-02', charName: '湯瑪斯·卡特', occupation: '戰地軍醫', san: 72 }
         ]
-      },
-      {
-        id: 'evt-103',
-        title: '皮克曼的模特兒：地下畫廊之夜',
-        scenario_name: '波士頓經典短篇改編',
-        one_liner: '天才畫家的畫作栩栩如生且極度駭人，直到他在暗門後銷聲匿跡。',
-        location: '線上 Discord 語音 + Roll20 沉浸地圖',
-        event_date: '2026-09-25T20:00:00',
-        max_players: 3,
-        min_players: 2,
-        lock_hours: 36,
-        status: 'open',
-        keeper_name: 'Keeper 奈亞',
-        keeper_contact: 'LINE: @nyar_coc',
-        booked_investigators: []
       }
     ];
+    const MOCK_CHARS = [{ id: 'char-1', name: '奧古斯特', occupation: '教授', san: 65, max_san: 99, feature: '狂熱於古符號', is_active: true }];
 
     const INITIAL_RECAPS = [
       {
@@ -180,131 +149,240 @@
         name: '奧古斯特·德雷斯',
         occupation: '密大古典學教授',
         san: 65,
-        maxSan: 99,
+        max_san: 99,
         feature: '隨身攜帶古代羊皮卷殘本，對古符號極具狂熱',
-        isActive: true
+        is_active: true
       },
       {
         id: 'char-2',
         name: '「渡鴉」伊蓮娜',
         occupation: '黑市古董掮客',
         san: 35,
-        maxSan: 85,
+        max_san: 85,
         feature: '聽覺敏銳，常在夜雨下水道聽見細微抓撓聲',
-        isActive: false
+        is_active: false
       }
     ];
 
+    // 3. 主應用程式 Component
     function App() {
-      // 導航狀態: 'lobby' (大廳) | 'archive' (花絮) | 'portal' (會員)
+      // --- 狀態管理 ---
       const [currentTab, setCurrentTab] = useState('lobby');
-
-      // 使用者狀態與權限
       const [currentUser, setCurrentUser] = useState(null);
-      const [userRole, setUserRole] = useState('member'); // 'member' | 'admin'
-      const [userExp, setUserExp] = useState(380);
+      const [profile, setProfile] = useState(null);
+      const [accountRole, setAccountRole] = useState('member');
+      const [userExp, setUserExp] = useState(0);
+      const [portalView, setPortalView] = useState('member');
 
       // 資料集
-      const [events, setEvents] = useState(INITIAL_EVENTS);
-      const [isLoadingEvents, setIsLoadingEvents] = useState(false);
-      const [isUsingRemoteDb, setIsUsingRemoteDb] = useState(false);
-      const [recaps, setRecaps] = useState(INITIAL_RECAPS);
-      const [characters, setCharacters] = useState(INITIAL_MY_CHARACTERS);
+      const [events, setEvents] = useState([]);
+      const [characters, setCharacters] = useState([]);
+      const [recaps, setRecaps] = useState([]);
+      const [isUsingMock, setIsUsingMock] = useState(false);
 
-      // 互動彈窗
+      // 互動視窗狀態
       const [activeEvent, setActiveEvent] = useState(null);
-      const [selectedCharId, setSelectedCharId] = useState(INITIAL_MY_CHARACTERS[0]?.id || '');
+      const [selectedCharId, setSelectedCharId] = useState('');
       const [lockAlertMessage, setLockAlertMessage] = useState(null);
 
-      // 身分驗證彈窗狀態
+      // 表單狀態
       const [showAuthModal, setShowAuthModal] = useState(false);
-      const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
+      const [authMode, setAuthMode] = useState('login'); // login | signup
       const [authEmail, setAuthEmail] = useState('');
       const [authPassword, setAuthPassword] = useState('');
-      const [authDisplayName, setAuthDisplayName] = useState('');
+      const [authName, setAuthName] = useState('');
+      
+      const [showNewEventModal, setShowNewEventModal] = useState(false);
+      const [newEventData, setNewEventData] = useState({ title: '', scenario_name: '', location: '', event_date: '', one_liner: '', min: 1, max: 4});
 
-      // 新建活動彈窗 (Keeper 用，取代 prompt)
-      const [showCreateEventModal, setShowCreateEventModal] = useState(false);
-      const [newEventData, setNewEventData] = useState({
-        title: '',
-        scenario_name: '',
-        one_liner: '',
-        location: '',
-        event_date: '2026-09-28T19:30:00',
-        max_players: 4,
-        min_players: 2
-      });
-
-      // 新增角色卡狀態
       const [showNewCharForm, setShowNewCharForm] = useState(false);
       const [newChar, setNewChar] = useState({ name: '', occupation: '', san: 60, feature: '' });
 
       // 自訂通知 Toast（取代原生 alert）
-      const [toast, setToast] = useState({ message: '', type: 'info', visible: false });
-      const triggerToast = (message, type = 'info') => {
-        setToast({ message, type, visible: true });
-        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4000);
+      const [toast, setToast] = useState({ show: false, msg: '', type: 'info' });
+      const showToast = (msg, type = 'info') => {
+        setToast({ show: true, msg, type });
+        setTimeout(() => setToast({ show: false, msg: '', type: 'info' }), 3000);
       };
 
-      // 1. 監聽當前登入狀態
       useEffect(() => {
-        if (!supabase) return;
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          setCurrentUser(session?.user ?? null);
-        });
+        if (!supabaseClient) {
+          console.error('❌ supabaseClient 不存在');
+          return;
+        }
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-          setCurrentUser(session?.user ?? null);
-        });
+        console.log('🔎 Supabase Client:', supabaseClient);
+        console.log('🔎 Supabase Auth:', supabaseClient.auth);
 
-        return () => subscription.unsubscribe();
+        if (!supabaseClient.auth) {
+          console.error('❌ supabaseClient.auth 不存在');
+          return;
+        }
+
+        // 取得目前登入狀態
+        supabaseClient.auth
+          .getSession()
+          .then(({ data, error }) => {
+            console.log('🔎 getSession:', data, error);
+
+            if (error) {
+              console.error('getSession error:', error);
+              return;
+            }
+
+            setCurrentUser(data?.session?.user ?? null);
+          });
+
+        // 監聽登入 / 登出
+        const {
+          data: authListener
+        } = supabaseClient.auth.onAuthStateChange(
+          (event, session) => {
+            console.log('🔐 Auth 狀態改變:', event, session);
+
+            setCurrentUser(session?.user ?? null);
+          }
+        );
+
+        return () => {
+          authListener?.subscription?.unsubscribe();
+        };
+
       }, []);
 
-      // 2. 抓取遠端場次，若資料庫為空或連線中則安全回退
-      const fetchEvents = async () => {
-        if (!supabase) return;
-        try {
-          setIsLoadingEvents(true);
-          const { data, error } = await supabase
-            .from('events')
-            .select(`
-              *,
-              bookings (
-                user_id,
-                profiles ( display_name, phone, line_id ),
-                characters ( name, occupation, san )
-              )
-            `)
-            .order('event_date', { ascending: true });
+      const fetchProfile = async (user) => {
+        if (!supabaseClient || !user) {
+          setProfile(null);
+          setAccountRole('member');
+          setUserExp(0);
+          setPortalView('member');
+          return;
+        }
 
-          if (!error && data && data.length > 0) {
-            const formatted = data.map(evt => ({
-              ...evt,
-              booked_investigators: (evt.bookings || []).map(b => ({
-                userId: b.user_id,
-                charName: b.characters?.name || '無名調查員',
-                occupation: b.characters?.occupation || '神秘學者',
-                san: b.characters?.san ?? 50,
-                phone: b.profiles?.phone || '未填寫',
-                lineId: b.profiles?.line_id || '未填寫'
-              }))
-            }));
-            setEvents(formatted);
-            setIsUsingRemoteDb(true);
-          } else {
-            // 資料庫尚未建立或尚無資料時，維持使用初始展示用資料
-            setIsUsingRemoteDb(false);
+        try {
+          const { data, error } = await supabaseClient
+            .from('profiles')
+            .select(`
+              id,
+              email,
+              display_name,
+              phone,
+              line_id,
+              exp,
+              title,
+              role
+            `)
+            .eq('id', user.id)
+            .single();
+
+          console.log('👤 Profile 查詢結果:', data);
+          console.log('👤 Profile 查詢錯誤:', error);
+
+          if (error) {
+            throw error;
           }
-        } catch (err) {
-          console.warn('遠端資料庫連線或讀取略過：', err.message);
-        } finally {
-          setIsLoadingEvents(false);
+
+          setProfile(data);
+
+          setAccountRole(
+            data?.role === 'admin'
+              ? 'admin'
+              : 'member'
+          );
+
+          setUserExp(
+            Number(data?.exp) || 0
+          );
+
+        } catch (error) {
+
+          console.error( '❌ Profile 讀取失敗:',error);
+
+          setProfile(null);
+          setAccountRole('member');
+          setUserExp(0);
+          setPortalView('member');
         }
       };
 
       useEffect(() => {
-        fetchEvents();
-      }, []);
+
+        if (currentUser) {
+
+          console.log('👤 已登入，讀取會員資料:', currentUser.id);
+
+          fetchProfile(currentUser);
+          fetchAllData();
+
+        } else {
+
+          console.log('👤 未登入');
+
+          setProfile(null);
+          setAccountRole('member');
+          setUserExp(0);
+          setPortalView('member');
+
+          // 登出後一定要清空上一個人的角色卡
+          setCharacters([]);
+          setSelectedCharId('');
+
+          // 公開場次仍然可以讀
+          fetchAllData();
+        }
+
+      }, [currentUser]);
+
+      const fetchAllData = async () => {
+        if (!supabaseClient) return useMockData();
+        try {
+          // 抓場次
+          const { data: evts, error: eErr } = await supabaseClient
+          .from('events')
+          .select(`
+            *,
+            bookings(
+              user_id,
+              characters(
+                name,
+                occupation,
+                san
+              )
+            )
+          `);
+
+        if (eErr) { throw eErr;}
+        console.log('events 查詢成功:', evts);
+          
+          const formattedEvts = evts.map(evt => ({
+            ...evt,
+            booked_investigators: (evt.bookings || []).map(b => ({
+              userId: b.user_id, charName: b.characters?.name || '無名', occupation: b.characters?.occupation, san: b.characters?.san
+            }))
+          }));
+          setEvents(formattedEvts);
+
+          // 若有登入，抓角色卡
+          if (currentUser) {
+            const { data: chars } = await supabaseClient.from('characters').select('*').eq('user_id', currentUser.id);
+            if (chars && chars.length > 0) {
+              setCharacters(chars);
+              setSelectedCharId(chars[0].id);
+            }
+          }
+          setIsUsingMock(false);
+        } catch (err) {
+          console.warn("使用本地展示資料:", err.message);
+          useMockData();
+        }
+      };
+
+      const useMockData = () => {
+        setEvents(MOCK_EVENTS);
+        setCharacters(MOCK_CHARS);
+        setSelectedCharId(MOCK_CHARS[0].id);
+        setIsUsingMock(true);
+      };
 
       // 稱號等級計算
       const levelTitle = useMemo(() => {
@@ -313,204 +391,282 @@
         return '【見習】初涉異變的調查員';
       }, [userExp]);
 
-      // 判斷當前使用者是否已在該場名單中
-      const isBooked = (event) => {
-        const myId = currentUser ? currentUser.id : 'demo-user-id';
-        return event.booked_investigators.some(i => i.userId === myId);
+      // 輔助判斷
+      const isBooked = (evt) => {
+        if (!evt || !evt.booked_investigators) return false;
+        const myId = currentUser?.id || 'mock-user';
+        return evt.booked_investigators.some(i => i.userId === myId);
       };
 
       // 檢查是否處於 36 小時鎖定退團視窗內
       const checkIsLocked = (eventDateStr, lockHours = 36) => {
         const eventTime = new Date(eventDateStr).getTime();
-        const now = new Date('2026-09-07T18:00:00').getTime();
-        const diffHours = (eventTime - now) / (1000 * 60 * 60);
-        return diffHours > 0 && diffHours <= lockHours;
+        const now = Date.now();
+        const diffMs = eventTime - now;
+        return (
+          diffMs > 0 &&
+          diffMs <= Number(lockHours || 36) * 60 * 60 * 1000
+        );
       };
 
+      /* 1. 登入與註冊 */
       const handleAuthSubmit = async (e) => {
         e.preventDefault();
-        if (!supabase) {
-          triggerToast('Supabase 客戶端未就緒，目前為離線展示模式。', 'error');
-          return;
-        }
+        console.log('=== 表單 submit 有觸發 ===');
+        console.log('authMode:', authMode);
+        console.log('email:', authEmail);
+        console.log('name:', authName);
 
-        if (authMode === 'login') {
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email: authEmail,
-            password: authPassword
-          });
-          if (error) {
-            triggerToast('登入失敗：' + error.message, 'error');
-          } else {
-            triggerToast(`歡迎歸來，調查員：${data.user.email}`, 'success');
-            setShowAuthModal(false);
+        if (!supabaseClient) {
+          console.error('Supabase Client 不存在');
+          return showToast('Supabase 尚未初始化', 'error');
+        }
+        try {
+          if (authMode === 'signup') {
+            console.log('準備呼叫 signUp');
+            const { data, error } =
+              await supabaseClient.auth.signUp({
+                email: authEmail.trim(),
+                password: authPassword,
+                options: {
+                  data: {
+                    full_name: authName.trim()
+                  }
+                }
+              });
+            console.log('SIGNUP DATA:', data);
+            console.log('SIGNUP ERROR:', error);
+
+            if (error) {
+              console.error('註冊失敗:', error);
+              showToast( '註冊失敗：' + error.message, 'error');
+              return;
+            }
+
+            showToast(data.session ? '註冊成功，已登入！' : '註冊成功！請查看信箱完成驗證。', 'success');
+
             setAuthEmail('');
             setAuthPassword('');
-          }
-        } else {
-          const { data, error } = await supabase.auth.signUp({
-            email: authEmail,
-            password: authPassword,
-            options: {
-              data: { full_name: authDisplayName || '無名調查員' }
-            }
-          });
-          if (error) {
-            triggerToast('註冊未完成：' + error.message, 'error');
+            setAuthName('');
+            setShowAuthModal(false);
+
           } else {
-            triggerToast('註冊成功！若控制台未關閉驗證信，請前往信箱確認。', 'success');
+            const { data, error } =
+              await supabaseClient.auth.signInWithPassword({
+                email: authEmail.trim(),
+                password: authPassword
+              });
+            console.log('LOGIN DATA:', data);
+            console.log('LOGIN ERROR:', error);
+
+            if (error) {
+              showToast( '登入失敗：' + error.message,'error');
+              return;
+            }
+
+            showToast('歡迎歸來，調查員。','success');
+            setAuthEmail('');
+            setAuthPassword('');
             setShowAuthModal(false);
           }
+        } catch (err) {
+          console.error('Auth 未預期錯誤:', err);
+          showToast('系統錯誤：' + err.message,'error');
         }
       };
 
       const handleLogout = async () => {
-        if (supabase) {
-          await supabase.auth.signOut();
-        }
-        setCurrentUser(null);
-        triggerToast('已安全登出調查員系統。', 'info');
+        if (supabaseClient) await supabaseClient.auth.signOut();
+        showToast('已安全登出。', 'info');
       };
 
+      /* 4. 報名與退團 */
       const handleJoinEvent = async (eventId) => {
-        // 1. 若未登入，引導開啟登入視窗
+
         if (!currentUser) {
-          triggerToast('【需要調查員身分】請先登入或註冊後再簽署調查契約！', 'error');
-          setAuthMode('login');
           setShowAuthModal(true);
-          return;
+          return showToast( '請先登入調查員系統。', 'error');
+        }
+        if (!selectedCharId) {
+          return showToast( '請先建立並選擇一張角色卡。', 'error');
         }
 
-        const char = characters.find(c => c.id === selectedCharId) || characters[0];
-        if (!char) {
-          triggerToast('請先在會員頁面登錄一張調查員角色卡！', 'error');
-          return;
-        }
+        const evt = events.find( event => event.id === eventId);
+        if (!evt) {return showToast('找不到這個場次。','error');}
+        if (evt.status !== 'open') {return showToast('這個場次目前無法報名。','error');}
 
-        // 2. 若有遠端連線，嘗試寫入 Supabase (優先採用 RPC 防超賣)
-        if (isUsingRemoteDb && supabase) {
-          try {
-            const { data, error } = await supabase.rpc('join_event_atomic', {
-              p_event_id: eventId,
-              p_character_id: char.id
-            });
+        const booked = evt.booked_investigators?.length || 0;
+        if (booked >= evt.max_players) { return showToast('很可惜，本場目前已額滿。','error');}
 
-            if (error) {
-              // 若 RPC 尚未建立，回退到一般 insert
-              const { error: insertError } = await supabase
-                .from('bookings')
-                .insert({
-                  event_id: eventId,
-                  user_id: currentUser.id,
-                  character_id: char.id,
-                  status: 'confirmed'
-                });
-              if (insertError) throw insertError;
-            }
+        try {
+          const { data, error} = await supabaseClient.rpc('join_event', { p_event_id: eventId, p_character_id: selectedCharId});
+          console.log('🎟 join_event result:', data);
+          console.log('🎟 join_event error:', error);
 
-            triggerToast('調查契約已成立！成功加入小隊。', 'success');
-            fetchEvents();
-            setActiveEvent(null);
-            return;
-          } catch (err) {
-            triggerToast('報名失敗：' + err.message, 'error');
-            return;
+          if (error) {
+            console.error('報名失敗:',error);
+            return showToast( error.message,'error');
           }
+          await fetchAllData();
+          // 避免 modal 保留舊的 event state
+          setActiveEvent(null);
+          showToast('契約立定，報名成功！','success');
+        } catch (err) {
+          console.error('報名發生錯誤:',err);
+          showToast('系統錯誤：' + err.message,'error');
         }
-
-        // 3. 離線/展示環境下的本機狀態模擬
-        setEvents(prev => prev.map(evt => {
-          if (evt.id === eventId) {
-            if (evt.booked_investigators.length >= evt.max_players) return evt;
-            return {
-              ...evt,
-              booked_investigators: [
-                ...evt.booked_investigators,
-                {
-                  userId: currentUser.id,
-                  charName: char.name,
-                  occupation: char.occupation,
-                  san: char.san,
-                  phone: '0988-777-666',
-                  lineId: '@investigator_me'
-                }
-              ]
-            };
-          }
-          return evt;
-        }));
-
-        triggerToast('契約立定！已加入調查小隊。', 'success');
-        setActiveEvent(null);
       };
 
-      const handleLeaveEvent = (evt) => {
-        if (checkIsLocked(evt.event_date, evt.lock_hours)) {
-          setLockAlertMessage(`開場前 ${evt.lock_hours} 小時已全面鎖定席位！為避免整團流會，退團請直接私訊聯絡 Keeper（${evt.keeper_contact}）。`);
+
+      const handleLeaveEvent = async (evt) => {
+
+        if (!currentUser) { return showToast('請先登入。','error');}
+        if (!evt?.id) { return showToast('場次資料錯誤。','error');}
+
+        // 前端檢查 36 小時規則
+        if (
+          checkIsLocked( evt.event_date, evt.lock_hours)
+        ) {
+          setLockAlertMessage( `本場已進入開團前 ${ evt.lock_hours || 36 } 小時鎖定期，如需退出請聯絡 Keeper。`);
           return;
         }
 
-        const myId = currentUser ? currentUser.id : 'demo-user-id';
+        try {
+          const { data, error} = await supabaseClient.rpc('leave_event',{ p_event_id: evt.id});
+          console.log('🚪 leave_event result:', data);
+          console.log('🚪 leave_event error:', error);
 
-        setEvents(prev => prev.map(e => {
-          if (e.id === evt.id) {
-            return {
-              ...e,
-              booked_investigators: e.booked_investigators.filter(i => i.userId !== myId)
-            };
+          if (error) {
+            console.error('退團失敗:', error);
+            setLockAlertMessage(error.message);
+            return;
           }
-          return e;
-        }));
+          await fetchAllData();
 
-        if (activeEvent && activeEvent.id === evt.id) {
-          setActiveEvent(prev => ({
-            ...prev,
-            booked_investigators: prev.booked_investigators.filter(i => i.userId !== myId)
-          }));
+          setActiveEvent(null);
+          showToast('已自名冊註銷。','info');
+
+        } catch (err) {
+          console.error('退團發生錯誤:',err);
+          showToast('系統錯誤：' + err.message,'error');
         }
-        triggerToast('已自調查小隊名冊中註銷席位。', 'info');
       };
 
-      const handleCreateChar = (e) => {
+      /* 2. 新增角色卡 */
+      const handleCreateChar = async (e) => {
         e.preventDefault();
         if (!newChar.name || !newChar.occupation) return;
-        const created = {
-          id: `char-${Date.now()}`,
+        
+        const payload = {
           name: newChar.name,
           occupation: newChar.occupation,
           san: Number(newChar.san) || 50,
-          maxSan: 99,
-          feature: newChar.feature || '隨身攜帶神祕符號懷錶',
-          isActive: false
+          max_san: 99,
+          feature: newChar.feature || '無',
+          is_active: true
         };
-        setCharacters(prev => [...prev, created]);
-        setSelectedCharId(created.id);
+
+        if (!isUsingMock && supabaseClient && currentUser) {
+          payload.user_id = currentUser.id;
+
+          const { error } = await supabaseClient
+            .from('characters')
+            .insert(payload);
+
+          if (error) {
+            console.error('建立角色失敗:', error);
+            return showToast('新增失敗：' + error.message, 'error');
+          }
+
+          await fetchAllData();
+        } else {
+          setCharacters(prev => [...prev, payload]);
+        }
+        showToast(`角色卡 [${newChar.name}] 建立成功！`, 'success');
         setShowNewCharForm(false);
-        setNewChar({ name: '', occupation: '', san: 60, feature: '' });
-        triggerToast(`角色卡「${created.name}」已登錄完成！`, 'success');
       };
 
-      const handleCreateNewEvent = (e) => {
+      /* 3. 發布新團務 (Keeper) */
+      const handleCreateEvent = async (e) => {
         e.preventDefault();
-        if (!newEventData.title || !newEventData.location) return;
-        const created = {
-          id: `evt-${Date.now()}`,
-          title: newEventData.title,
-          scenario_name: newEventData.scenario_name || '原創調查模組',
-          one_liner: newEventData.one_liner || '古老村落傳來異常低語，等待調查員前往探查。',
-          location: newEventData.location,
-          event_date: newEventData.event_date,
-          max_players: Number(newEventData.max_players) || 4,
-          min_players: Number(newEventData.min_players) || 2,
-          lock_hours: 36,
-          status: 'open',
-          keeper_name: currentUser ? (currentUser.user_metadata?.full_name || 'Keeper') : 'Keeper 奈亞',
-          keeper_contact: 'LINE: @miskatonic_keeper',
-          booked_investigators: []
-        };
-        setEvents(prev => [created, ...prev]);
-        setShowCreateEventModal(false);
-        triggerToast('新團務場次已成功發布至跑團大廳！', 'success');
+
+        // 前端第一層防護
+        if (!currentUser) { return showToast( '請先登入 Keeper 帳號。', 'error'); }
+        if (accountRole !== 'admin') { return showToast('權限不足：只有 Keeper 可以發布團務。', 'error');}
+
+        if (!newEventData.title.trim()) { return showToast('請輸入場次標題。', 'error');}
+        if (!newEventData.scenario_name.trim()) {return showToast('請輸入劇本名稱。', 'error');}
+        if (!newEventData.event_date) {return showToast('請選擇開團時間。', 'error');}
+
+        try {
+          const minPlayers = Number(newEventData.min);
+          const maxPlayers = Number(newEventData.max);
+          if (
+            !Number.isInteger(minPlayers) ||
+            !Number.isInteger(maxPlayers) ||
+            minPlayers < 1 || maxPlayers < 1
+          ) {
+            return showToast('最低與最高人數至少都要是 1 人。','error');
+          }
+
+          if (minPlayers > maxPlayers) {
+            return showToast('最低人數不能高於最高人數。','error');
+          }
+
+          if (maxPlayers > 8) {
+            return showToast('目前最高人數上限設定為 8 人。','error');
+          }
+
+          const payload = {
+            title: newEventData.title.trim(),
+            scenario_name: newEventData.scenario_name.trim(),
+            location: newEventData.location.trim(),
+            event_date: new Date(
+              newEventData.event_date
+            ).toISOString(),
+            one_liner: newEventData.one_liner.trim(),
+
+            min_players: minPlayers,
+            max_players: maxPlayers,
+
+            lock_hours: 36,
+            status: 'open',
+
+            keeper_name:
+              profile?.display_name ||
+              currentUser.user_metadata?.full_name ||
+              'Keeper',
+
+            keeper_contact:
+              profile?.line_id ||
+              profile?.phone ||
+              currentUser.email
+          };
+
+          console.log( '📜 準備建立團務:', payload);
+
+          const { data, error } = await supabaseClient
+            .from('events').insert(payload).select().single();
+
+          console.log('📜 建立團務結果:', data);
+          console.log('📜 建立團務錯誤:', error);
+
+          if (error) { return showToast('發布失敗：' + error.message,'error');}
+
+          showToast(`團務「${data.title}」發布成功！`,'success');
+
+          // 清空表單
+          setNewEventData({title: '',scenario_name: '',location: '',event_date: '',one_liner: '', min: 1, max: 4});
+          setShowNewEventModal(false);
+
+          // 重新抓 Supabase 真實資料
+          await fetchAllData();
+
+        } catch (err) {
+          console.error('建立團務發生錯誤:',err);
+
+          showToast('系統錯誤：' + err.message,'error');
+        }
       };
 
       const handleAdminKick = (eventId, userId) => {
@@ -523,108 +679,180 @@
           }
           return evt;
         }));
-        triggerToast('已將該名調查員移出隊伍。', 'info');
+        showToast('已將該名調查員移出隊伍。', 'info');
       };
 
+      const handleAdminDeleteEvent = async (eventId) => {
+        if (accountRole !== 'admin') {
+          return showToast('只有 Keeper 可以刪除場次。','error');
+        }
+        try {
+          const { error } = await supabaseClient.from('events').delete().eq('id', eventId);
+          console.log('🗑 刪除場次:', eventId, error);
+          if (error) { return showToast('刪除失敗：' + error.message,'error');}
+          await fetchAllData();
+          showToast('場次已從資料庫刪除。','success');
+        } catch (err) {
+          console.error('刪除場次錯誤:',err);
+          showToast('刪除失敗：' + err.message,'error');
+        }
+      };
+
+      // 編輯團務
+      const [editingEvent, setEditingEvent] =  useState(null);
+
+      const [editEventData, setEditEventData] =
+        useState({
+          title: '',
+          scenario_name: '',
+          location: '',
+          event_date: '',
+          one_liner: '',
+          min: 1,
+          max: 4
+        });
+      
+      // 日期轉換工具
+      const toDatetimeLocal = (dateString) => {
+        const date = new Date(dateString);
+        const offset =
+          date.getTimezoneOffset() * 60000;
+        return new Date(
+          date.getTime() - offset
+        )
+          .toISOString()
+          .slice(0, 16);
+      };
+
+      const handleOpenEditEvent = (evt) => {
+        if ( isEventChangeLocked( evt.event_date,evt.lock_hours)) {
+          return showToast(`本場已進入開團前 ${evt.lock_hours || 36} 小時鎖定期，無法修改。`,'error');
+        }
+
+        setEditingEvent(evt);
+        setEditEventData({
+          title: evt.title || '',
+          scenario_name: evt.scenario_name || '',
+          location: evt.location || '',
+          event_date:
+            toDatetimeLocal(evt.event_date),
+          one_liner: evt.one_liner || '',
+          min: evt.min_players || 1,
+          max: evt.max_players || 4
+        });
+      };
+
+      const isEventChangeLocked = (
+        eventDateStr,
+        lockHours = 36
+      ) => {
+        const eventTime = new Date(eventDateStr).getTime();
+        const lockTime = eventTime - Number(lockHours || 36) * 60 * 60 * 1000;
+        return Date.now() >= lockTime;
+      };
+
+      // 儲存編輯
+      const handleUpdateEvent = async (e) => {
+        e.preventDefault();
+        if (!editingEvent) return;
+        const minPlayers = Number(editEventData.min);
+        const maxPlayers = Number(editEventData.max);
+
+        if (
+          !Number.isInteger(minPlayers) ||
+          !Number.isInteger(maxPlayers) ||
+          minPlayers < 1 ||
+          maxPlayers < 1 ||
+          minPlayers > maxPlayers ||
+          maxPlayers > 8
+        ) {
+          return showToast('人數設定錯誤：最低至少 1 人、最高最多 8 人，且最低人數不可高於最高人數。','error');
+        }
+
+        if (!editEventData.title.trim()) {return showToast('請輸入場次標題。', 'error');}
+        if (!editEventData.scenario_name.trim()) {return showToast('請輸入劇本名稱。', 'error');}
+        if (!editEventData.location.trim()) {return showToast('請輸入集合地點。', 'error');}
+        if (!editEventData.event_date) {return showToast('請選擇開團時間。', 'error');}
+
+        try {
+          const { data, error } =
+            await supabaseClient.rpc(
+              'update_event',
+              {
+                p_event_id: editingEvent.id,
+                p_title: editEventData.title.trim(),
+                p_scenario_name: editEventData.scenario_name.trim(),
+                p_location: editEventData.location.trim(),
+                p_event_date: new Date(editEventData.event_date).toISOString(),
+                p_one_liner: editEventData.one_liner.trim(),
+                p_min_players: minPlayers,
+                p_max_players: maxPlayers
+              }
+            );
+          console.log('📝 修改團務:',data,error);
+
+          if (error) {return showToast('修改失敗：' + error.message, 'error');}
+          setEditingEvent(null);
+
+          await fetchAllData();
+          showToast('團務修改成功！','success');
+
+        } catch (err) {
+          console.error('修改團務錯誤:',err);
+          showToast('修改失敗：' + err.message,'error');
+        }
+      };
+
+      // 發放經驗
       const handleAdminSettle = (eventId, exp = 100) => {
         setUserExp(prev => prev + exp);
         setEvents(prev => prev.map(e => e.id === eventId ? { ...e, status: 'completed' } : e));
-        triggerToast(`結算完成！已向小隊發放 +${exp} EXP。`, 'success');
+        showToast(`結算完成！已向小隊發放 +${exp} EXP。`, 'success');
       };
 
       return (
         <div className="min-h-screen flex flex-col justify-between text-parchment font-sans">
           
           {/* 自訂沉浸式通知 Toast */}
-          {toast.visible && (
-            <div className="fixed top-6 right-6 z-50 animate-bounce">
-              <div className={`px-5 py-3 rounded-2xl shadow-2xl border text-sm font-medium flex items-center gap-3 backdrop-blur-xl ${
+          {toast.show && (
+            <div className="fixed bottom-6 right-6 z-50 animate-toast">
+              <div className={`px-5 py-3 rounded-xl shadow-2xl border flex items-center gap-3 backdrop-blur-md ${
                 toast.type === 'error' ? 'bg-crimsonDark/90 border-crimson text-white' :
-                toast.type === 'success' ? 'bg-emerald-950/90 border-emerald-500 text-emerald-200' :
-                'bg-purple-950/90 border-mystic text-parchment'
+                toast.type === 'success' ? 'bg-emerald-950/90 border-emerald-500 text-emerald-100' :
+                'bg-cardBg border-mystic text-parchment'
               }`}>
-                <span>{toast.type === 'error' ? '⚠️' : toast.type === 'success' ? '📜' : 'ℹ️'}</span>
-                <span>{toast.message}</span>
+                <span>{toast.type === 'error' ? '⚠️' : '📜'}</span>
+                <span className="font-medium text-sm">{toast.msg}</span>
               </div>
             </div>
           )}
 
           {/* 頂部極簡現代導航 */}
           <header className="sticky top-0 z-30 bg-void/85 backdrop-blur-xl border-b border-purple-900/30">
-            <div className="max-w-6xl mx-auto px-5 py-4 flex items-center justify-between">
+            <div className="max-w-6xl mx-auto px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               
               {/* Logo */}
-              <div 
-                onClick={() => setCurrentTab('lobby')}
-                className="flex items-center gap-3 cursor-pointer group"
-              >
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-mystic to-purple-950 flex items-center justify-center text-xl shadow-glow-purple group-hover:scale-105 transition">
-                  ⍟
-                </div>
+              <div onClick={() => setCurrentTab('lobby')} className="flex items-center gap-3 cursor-pointer group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-mystic to-purple-950 flex items-center justify-center shadow-glow-purple">⍟</div>
                 <div>
-                  <h1 className="font-gothic text-xl font-bold tracking-wider text-parchment flex items-center gap-2">
-                    MISKATONIC <span className="text-copper text-sm font-sans font-medium">密斯卡託尼克</span>
-                  </h1>
-                  <p className="text-xs text-mutedText tracking-widest">CoC TRPG 預約與冒險管理</p>
+                  <h1 className="font-gothic text-lg font-bold text-parchment">MISKATONIC</h1>
+                  <p className="text-[10px] text-copper tracking-widest uppercase">TRPG Reservation System</p>
                 </div>
               </div>
 
               {/* 導航 Tabs 與登入狀態 */}
               <div className="flex items-center gap-3">
                 <nav className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentTab('lobby')}
-                    className={`px-4 py-2 rounded-xl text-sm sm:text-base font-medium transition-all ${
-                      currentTab === 'lobby'
-                        ? 'bg-mysticDark/60 text-parchment border border-mystic/40 shadow-glow-purple'
-                        : 'text-mutedText hover:text-parchment hover:bg-white/5'
-                    }`}
-                  >
-                    跑團大廳
-                  </button>
-                  <button
-                    onClick={() => setCurrentTab('archive')}
-                    className={`px-4 py-2 rounded-xl text-sm sm:text-base font-medium transition-all ${
-                      currentTab === 'archive'
-                        ? 'bg-mysticDark/60 text-parchment border border-mystic/40 shadow-glow-purple'
-                        : 'text-mutedText hover:text-parchment hover:bg-white/5'
-                    }`}
-                  >
-                    檔案館與花絮
-                  </button>
-                  <button
-                    onClick={() => setCurrentTab('portal')}
-                    className={`px-4 py-2 rounded-xl text-sm sm:text-base font-medium transition-all flex items-center gap-2 ${
-                      currentTab === 'portal'
-                        ? 'bg-copper/20 text-copper border border-copper/50 shadow-glow-purple'
-                        : 'text-mutedText hover:text-copper hover:bg-white/5'
-                    }`}
-                  >
-                    <span>🗂 會員專區</span>
-                  </button>
+                  <button onClick={() => setCurrentTab('lobby')} className={`px-4 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap ${currentTab === 'lobby' ? 'bg-mysticDark/60 text-white border border-mystic/40 shadow-glow-purple' : 'text-mutedText hover:text-white'}`}>跑團大廳</button>
+                  <button onClick={() => setCurrentTab('archive')} className={`px-4 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap ${currentTab === 'archive' ? 'bg-mysticDark/60 text-white border border-mystic/40 shadow-glow-purple' : 'text-mutedText hover:text-white'}`}>花絮檔案</button>
+                  <button onClick={() => setCurrentTab('portal')} className={`px-4 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap ${currentTab === 'portal' ? 'bg-copper/20 text-copper border border-copper/50 shadow-glow-purple' : 'text-mutedText hover:text-copper'}`}>🗂 會員手帳</button>
                 </nav>
 
-                {/* 登入 / 帳號按鈕 */}
-                <div className="pl-2 border-l border-purple-950">
+                <div className="border-l border-purple-900 pl-2 ml-1 flex items-center">
                   {currentUser ? (
-                    <div className="flex items-center gap-2">
-                      <span className="hidden md:inline text-xs text-copper truncate max-w-[120px]">
-                        {currentUser.user_metadata?.full_name || currentUser.email.split('@')[0]}
-                      </span>
-                      <button
-                        onClick={handleLogout}
-                        className="px-3 py-1.5 bg-stone-900 hover:bg-red-950 text-stone-300 hover:text-red-300 rounded-xl text-xs transition border border-stone-800"
-                      >
-                        登出
-                      </button>
-                    </div>
+                    <button onClick={handleLogout} className="px-3 py-2 text-xs text-red-400 hover:bg-red-950/30 rounded-xl transition">登出</button>
                   ) : (
-                    <button
-                      onClick={() => setShowAuthModal(true)}
-                      className="px-4 py-2 bg-copper hover:bg-copperDark text-black font-bold rounded-xl text-xs sm:text-sm transition shadow-glow-purple"
-                    >
-                      登入 / 註冊
-                    </button>
+                    <button onClick={() => setShowAuthModal(true)} className="px-4 py-2 bg-copper hover:bg-copperDark text-black text-xs font-bold rounded-xl transition shadow-glow-purple whitespace-nowrap">登入/註冊</button>
                   )}
                 </div>
               </div>
@@ -632,12 +860,10 @@
             </div>
           </header>
 
-          {}
+          {/* 主要內容區 */}
           <main className="max-w-6xl mx-auto px-5 py-10 flex-1 w-full">
             
-            {/* ========================================================
-                分頁 1: 跑團大廳
-               ======================================================== */}
+            {/* ====== 分頁 1: 跑團大廳 ====== */}
             {currentTab === 'lobby' && (
               <div className="space-y-8">
                 
@@ -648,7 +874,7 @@
                       <span className="text-xs uppercase tracking-widest text-copper bg-copper/10 px-3 py-1 rounded-full border border-copper/30">
                         ★ 每週精選團務預約
                       </span>
-                      {isUsingRemoteDb ? (
+                      {!isUsingMock ? (
                         <span className="text-xs text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-800">
                           ● Supabase 即時同步中
                         </span>
@@ -662,7 +888,7 @@
                       深淵正靜候勇敢的調查員。
                     </h2>
                     <p className="text-base text-mutedText leading-relaxed">
-                      點選任一卡片即可即時查看小隊名單並快速報名。出團前 36 小時將鎖定席位。
+                      點選任一卡片即可即時查看小隊名單並快速報名。出團時間截止時將鎖定席位。
                     </p>
                   </div>
                 </div>
@@ -670,8 +896,8 @@
                 {/* 卡片網格 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {events.map((evt) => {
-                    const bookedNum = evt.booked_investigators.length;
-                    const isFull = bookedNum >= evt.max_players;
+                    const booked = evt.booked_investigators?.length || 0;
+                    const isFull = booked >= evt.max_players;
                     const hasJoined = isBooked(evt);
                     const locked = checkIsLocked(evt.event_date, evt.lock_hours);
 
@@ -682,7 +908,6 @@
                         className="group bg-cardBg hover:bg-cardHover rounded-3xl p-6 border border-purple-900/30 hover:border-copper/60 transition-all duration-300 cursor-pointer shadow-modern-card hover:shadow-modern-hover flex flex-col justify-between"
                       >
                         <div className="space-y-4">
-                          {/* 頂部標籤與狀態 */}
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-purple-950 text-purple-300 border border-purple-700/50">
                               {evt.scenario_name}
@@ -734,7 +959,7 @@
                           <div className="flex justify-between text-xs font-medium">
                             <span className="text-mutedText">小隊席位</span>
                             <span className="text-copper font-bold">
-                              {bookedNum} / {evt.max_players} 人 ({bookedNum >= evt.min_players ? '已成團' : `差 ${evt.min_players - bookedNum} 人成團`})
+                              {booked} / {evt.max_players} 人 ({booked >= evt.min_players ? '已成團' : `差 ${evt.min_players - booked} 人成團`})
                             </span>
                           </div>
                           
@@ -743,7 +968,7 @@
                               className={`h-full transition-all duration-500 ${
                                 isFull ? 'bg-crimson' : 'bg-gradient-to-r from-mystic to-copper'
                               }`}
-                              style={{ width: `${(bookedNum / evt.max_players) * 100}%` }}
+                              style={{ width: `${(booked / evt.max_players) * 100}%` }}
                             ></div>
                           </div>
 
@@ -854,10 +1079,10 @@
                     <div>
                       <div className="flex items-center gap-3">
                         <h2 className="text-2xl font-bold text-parchment">
-                          {currentUser ? (currentUser.user_metadata?.full_name || currentUser.email) : '調查員代號 #Arkham-709'}
+                          {currentUser ? (profile?.display_name || currentUser.user_metadata?.full_name || currentUser.email) : '尚未登入'}
                         </h2>
                         <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-                          {userRole === 'admin' ? 'Keeper 守密人' : '已認證調查員'}
+                          {accountRole === 'admin' ? 'Keeper 守密人' : '已認證調查員'}
                         </span>
                       </div>
                       <p className="text-sm text-copper mt-0.5 font-medium">{levelTitle} • 累積 {userExp} EXP</p>
@@ -870,26 +1095,33 @@
                   {/* 切換視角 (會員 vs 管理員) */}
                   <div className="flex items-center gap-2 bg-void p-1.5 rounded-2xl border border-purple-900/50">
                     <button
-                      onClick={() => setUserRole('member')}
+                      onClick={() => setPortalView('member')}
                       className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
-                        userRole === 'member' ? 'bg-mystic text-white font-bold' : 'text-mutedText hover:text-white'
+                        portalView === 'member'
+                          ? 'bg-mystic text-white font-bold'
+                          : 'text-mutedText hover:text-white'
                       }`}
                     >
                       會員視角 (我的手帳)
                     </button>
-                    <button
-                      onClick={() => setUserRole('admin')}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
-                        userRole === 'admin' ? 'bg-crimson text-white font-bold shadow-glow-purple' : 'text-mutedText hover:text-white'
-                      }`}
-                    >
-                      ⚡ Keeper 管理員後台
-                    </button>
+
+                    {accountRole === 'admin' && (
+                      <button
+                        onClick={() => setPortalView('admin')}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+                          portalView === 'admin'
+                            ? 'bg-crimson text-white font-bold shadow-glow-purple'
+                            : 'text-mutedText hover:text-white'
+                        }`}
+                      >
+                        ⚡ Keeper 管理員後台
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 {/* 視角 A: 一般會員 */}
-                {userRole === 'member' && (
+                {portalView === 'member' && (
                   <div className="space-y-8">
                     {/* 角色卡管理 */}
                     <div className="space-y-4">
@@ -981,7 +1213,7 @@
                           <div 
                             key={c.id}
                             className={`p-5 rounded-2xl border transition-all ${
-                              c.isActive ? 'bg-cardHover border-copper shadow-glow-purple' : 'bg-cardBg border-purple-950'
+                              c.is_active ? 'bg-cardHover border-copper shadow-glow-purple' : 'bg-cardBg border-purple-950'
                             }`}
                           >
                             <div className="flex justify-between items-start">
@@ -991,14 +1223,14 @@
                               </div>
                               <button
                                 onClick={() => {
-                                  setCharacters(prev => prev.map(item => ({ ...item, isActive: item.id === c.id })));
+                                  setCharacters(prev => prev.map(item => ({ ...item, is_active: item.id === c.id })));
                                   setSelectedCharId(c.id);
                                 }}
                                 className={`text-xs px-3 py-1 rounded-xl font-bold transition ${
-                                  c.isActive ? 'bg-copper text-black' : 'bg-void text-mutedText hover:text-white border border-purple-900'
+                                  c.is_active ? 'bg-copper text-black' : 'bg-void text-mutedText hover:text-white border border-purple-900'
                                 }`}
                               >
-                                {c.isActive ? '✓ 出戰中' : '設為出戰'}
+                                {c.is_active ? '✓ 出戰中' : '設為出戰'}
                               </button>
                             </div>
 
@@ -1007,13 +1239,13 @@
                               <div className="flex justify-between text-xs font-semibold">
                                 <span className="text-mutedText">理智值 (SAN)</span>
                                 <span className={c.san < 40 ? 'text-red-400 animate-pulse font-bold' : 'text-emerald-400'}>
-                                  {c.san} / {c.maxSan} {c.san < 40 && '【瀕臨瘋狂】'}
+                                  {c.san} / {c.max_san} {c.san < 40 && '【瀕臨瘋狂】'}
                                 </span>
                               </div>
                               <div className="w-full bg-stone-900 h-2 rounded-full overflow-hidden">
                                 <div
                                   className={`h-full ${c.san < 40 ? 'bg-red-500' : 'bg-emerald-500'}`}
-                                  style={{ width: `${(c.san / c.maxSan) * 100}%` }}
+                                  style={{ width: `${(c.san / c.max_san) * 100}%` }}
                                 ></div>
                               </div>
                             </div>
@@ -1063,7 +1295,7 @@
                 )}
 
                 {/* 視角 B: Keeper 管理員專區 */}
-                {userRole === 'admin' && (
+                {accountRole === 'admin' && portalView === 'admin' && (
                   <div className="space-y-6">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-purple-900/40 pb-3">
                       <div>
@@ -1074,7 +1306,7 @@
                       </div>
 
                       <button
-                        onClick={() => setShowCreateEventModal(true)}
+                        onClick={() => setShowNewEventModal(true)}
                         className="px-4 py-2 bg-crimson hover:bg-crimsonDark text-white rounded-xl text-sm font-bold shadow-glow-purple transition"
                       >
                         + 發布新團務場次
@@ -1093,22 +1325,24 @@
                               </p>
                             </div>
                             <div className="flex items-center gap-2">
+                              <button
+                                disabled={isEventChangeLocked( evt.event_date,evt.lock_hours)}
+                                onClick={() =>  handleOpenEditEvent(evt)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                                  isEventChangeLocked( evt.event_date,evt.lock_hours)
+                                    ? 'bg-stone-900 text-stone-600 cursor-not-allowed'
+                                    : 'bg-purple-950 hover:bg-purple-900 border border-purple-600 text-purple-300'
+                                }`}
+                              >
+                                {isEventChangeLocked( evt.event_date,evt.lock_hours ) ? '🔒 團務已鎖定' : '✏️ 修改團務'}
+                              </button>
                               {evt.status !== 'completed' && (
-                                <button
-                                  onClick={() => handleAdminSettle(evt.id, 120)}
-                                  className="px-3.5 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-600 text-emerald-300 rounded-xl text-xs font-bold transition"
-                                >
+                                <button onClick={() => handleAdminSettle(evt.id, 120)} className="px-3.5 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-600 text-emerald-300 rounded-xl text-xs font-bold transition">
                                   ⚡ 一鍵結算 (+120 EXP)
                                 </button>
                               )}
-                              <button
-                                onClick={() => {
-                                  setEvents(prev => prev.filter(e => e.id !== evt.id));
-                                  triggerToast('場次已關閉下架。', 'info');
-                                }}
-                                className="px-3 py-1.5 bg-stone-900 hover:bg-red-950 text-stone-400 hover:text-red-300 rounded-xl text-xs transition"
-                              >
-                                關閉場次
+                              <button onClick={() => handleAdminDeleteEvent(evt.id)} className="px-3 py-1.5 bg-stone-900 hover:bg-red-950 text-stone-400 hover:text-red-300 rounded-xl text-xs transition">
+                                刪除場次
                               </button>
                             </div>
                           </div>
@@ -1267,15 +1501,22 @@
                           返回
                         </button>
                         <button
-                          disabled={activeEvent.booked_investigators.length >= activeEvent.max_players}
+                          disabled={
+                            checkIsLocked(activeEvent.event_date,activeEvent.lock_hours) ||
+                            activeEvent.booked_investigators.length >= activeEvent.max_players
+                          }
                           onClick={() => handleJoinEvent(activeEvent.id)}
                           className={`px-6 py-2.5 rounded-xl text-sm font-bold transition shadow-glow-purple ${
+                            checkIsLocked(activeEvent.event_date,activeEvent.lock_hours) ||
                             activeEvent.booked_investigators.length >= activeEvent.max_players
                               ? 'bg-stone-900 text-stone-600 cursor-not-allowed'
                               : 'bg-copper hover:bg-copperDark text-black'
                           }`}
                         >
-                          {activeEvent.booked_investigators.length >= activeEvent.max_players ? '席位已額滿' : '簽署契約・一鍵報名'}
+                          {checkIsLocked(activeEvent.event_date,activeEvent.lock_hours)
+                            ? `開團前 ${activeEvent.lock_hours || 36} 小時已停止報名`
+                            : activeEvent.booked_investigators.length >= activeEvent.max_players
+                              ? '席位已額滿' : '簽署契約・一鍵報名'}
                         </button>
                       </div>
                     </div>
@@ -1311,8 +1552,8 @@
                         required
                         type="text"
                         placeholder="例：阿卡姆神祕客"
-                        value={authDisplayName}
-                        onChange={e => setAuthDisplayName(e.target.value)}
+                        value={authName}
+                        onChange={e => setAuthName(e.target.value)}
                         className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
                       />
                     </div>
@@ -1362,119 +1603,99 @@
             </div>
           )}
 
-          {}
-          {showCreateEventModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-              <div className="bg-cardBg border border-crimson/50 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
-                
-                <div className="flex justify-between items-center border-b border-purple-950 pb-3">
-                  <h3 className="text-xl font-bold text-crimson flex items-center gap-2">
-                    <span>⚡</span> 發布新團務場次
-                  </h3>
-                  <button onClick={() => setShowCreateEventModal(false)} className="text-mutedText hover:text-white">✕</button>
-                </div>
-
-                <form onSubmit={handleCreateNewEvent} className="space-y-4 text-sm">
-                  <div>
-                    <label className="block text-xs text-mutedText mb-1">場次標題 *</label>
-                    <input
-                      required
-                      type="text"
-                      placeholder="例：深入達維奇村的黑夜狂嘯"
-                      value={newEventData.title}
-                      onChange={e => setNewEventData({...newEventData, title: e.target.value})}
-                      className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
-                    />
-                  </div>
-
+          {/* ==========================================
+              彈窗：新增團務 (Keeper 專用)
+             ========================================== */}
+           {showNewEventModal && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="bg-cardBg w-full max-w-md rounded-3xl p-6 sm:p-8 border border-crimson/40 relative">
+                <h3 className="text-xl font-bold text-crimson mb-4">發布新團務</h3>
+                <form onSubmit={handleCreateEvent} className="space-y-3">
+                  <input required type="text" placeholder="場次標題" value={newEventData.title} onChange={e=>setNewEventData({...newEventData, title:e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white" />
+                  <input required type="text" placeholder="劇本名稱，例如：無名祭祀書" value={newEventData.scenario_name} onChange={e =>setNewEventData({...newEventData, scenario_name: e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white"/>
+                  <input required type="text" placeholder="集合地點" value={newEventData.location} onChange={e=>setNewEventData({...newEventData, location:e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white" />
+                  <input required type="datetime-local" value={newEventData.event_date} onChange={e=>setNewEventData({...newEventData, event_date:e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white" />
+                  <input required type="text" placeholder="一句話導讀" value={newEventData.one_liner} onChange={e=>setNewEventData({...newEventData, one_liner:e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white" />
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-mutedText mb-1">劇本名稱</label>
-                      <input
-                        type="text"
-                        placeholder="例：原創經典改編"
-                        value={newEventData.scenario_name}
-                        onChange={e => setNewEventData({...newEventData, scenario_name: e.target.value})}
-                        className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
-                      />
+                      <label className="block text-xs text-mutedText mb-1">最低成團人數</label>
+                      <input required type="number" min="1" max="8" value={newEventData.min} onChange={e => setNewEventData({...newEventData,min: e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white"/>
                     </div>
                     <div>
-                      <label className="block text-xs text-mutedText mb-1">開團時間 *</label>
-                      <input
-                        required
-                        type="datetime-local"
-                        value={newEventData.event_date}
-                        onChange={e => setNewEventData({...newEventData, event_date: e.target.value})}
-                        className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment text-xs"
-                      />
+                      <label className="block text-xs text-mutedText mb-1">最高人數</label>
+                      <input required type="number" min="1" max="8" value={newEventData.max} onChange={e => setNewEventData({...newEventData,max: e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white"/>
                     </div>
                   </div>
-
-                  <div>
-                    <label className="block text-xs text-mutedText mb-1">集合地點 *</label>
-                    <input
-                      required
-                      type="text"
-                      placeholder="例：台北市大安區秘密聚會所 (實體面團)"
-                      value={newEventData.location}
-                      onChange={e => setNewEventData({...newEventData, location: e.target.value})}
-                      className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-mutedText mb-1">一句話神秘導讀</label>
-                    <input
-                      type="text"
-                      placeholder="偏遠古村傳來山丘轟鳴，當地警長請求緊急支援..."
-                      value={newEventData.one_liner}
-                      onChange={e => setNewEventData({...newEventData, one_liner: e.target.value})}
-                      className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-mutedText mb-1">成團人數 (Min)</label>
-                      <input
-                        type="number"
-                        min="2"
-                        max="6"
-                        value={newEventData.min_players}
-                        onChange={e => setNewEventData({...newEventData, min_players: e.target.value})}
-                        className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-mutedText mb-1">席位上限 (Max)</label>
-                      <input
-                        type="number"
-                        min="2"
-                        max="8"
-                        value={newEventData.max_players}
-                        onChange={e => setNewEventData({...newEventData, max_players: e.target.value})}
-                        className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-3 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateEventModal(false)}
-                      className="px-4 py-2 text-sm text-mutedText hover:text-white"
-                    >
-                      取消
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-5 py-2 bg-crimson hover:bg-crimsonDark text-white font-bold rounded-xl text-sm transition"
-                    >
-                      確認發布場次
-                    </button>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={()=>setShowNewEventModal(false)} className="px-4 py-2 text-sm text-mutedText">取消</button>
+                    <button type="submit" className="px-4 py-2 bg-crimson text-white font-bold text-sm rounded-lg">確認發布</button>
                   </div>
                 </form>
-
+              </div>
+            </div>
+          )}
+          {/* ==========================================
+              彈窗：編輯團務 (Keeper 專用)
+            ========================================== */}
+          {editingEvent && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="bg-cardBg w-full max-w-md rounded-3xl p-6 sm:p-8 border border-mystic/40 relative shadow-2xl">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-xl font-bold text-copper">✏️ 編輯團務</h3>
+                    <p className="text-xs text-mutedText mt-1">開團前 {editingEvent.lock_hours || 36} 小時將鎖定團務資料</p>
+                  </div>
+                  <button type="button" onClick={() => setEditingEvent(null)} className="w-8 h-8 rounded-full bg-void text-mutedText hover:text-white transition">✕</button>
+                </div>
+                <form onSubmit={handleUpdateEvent} className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">場次標題 *</label>
+                    <input required type="text" value={editEventData.title} onChange={e => setEditEventData({...editEventData,title: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">劇本名稱 *</label>
+                    <input required type="text" value={editEventData.scenario_name} onChange={e => setEditEventData({...editEventData,scenario_name: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">集合地點 *</label>
+                    <input required type="text" value={editEventData.location} onChange={e => setEditEventData({...editEventData,location: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">開團日期與時間 *</label>
+                    <input required type="datetime-local" value={editEventData.event_date} onChange={e => setEditEventData({...editEventData,event_date: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                    <p className="text-[11px] text-mutedText mt-1">
+                      修改後的新開團時間也必須距離現在超過 {editingEvent.lock_hours || 36} 小時。
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">一句話導讀 *</label>
+                    <input required type="text" value={editEventData.one_liner} onChange={e => setEditEventData({...editEventData,one_liner: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-mutedText mb-1">最低成團人數</label>
+                      <input required type="number" min="1" max="8" value={editEventData.min} onChange={e => setEditEventData({...editEventData, min: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-mutedText mb-1">最高人數</label>
+                      <input required type="number" min="1" max="8" value={editEventData.max} onChange={e => setEditEventData({...editEventData, max: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                    </div>
+                  </div>
+                  <div className="bg-void/60 border border-purple-950 rounded-xl p-3 text-xs text-mutedText">
+                    目前已報名：
+                    <strong className="text-copper ml-1">
+                      {editingEvent.booked_investigators?.length || 0} 人
+                    </strong>
+                    <div className="mt-1">
+                      最高人數不可設定低於目前已報名人數。
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-3 border-t border-purple-950">
+                    <button type="button" onClick={() => setEditingEvent(null)} className="px-4 py-2 text-sm text-mutedText hover:text-white transition">取消</button>
+                    <button type="submit" className="px-5 py-2 bg-copper hover:bg-copperDark text-black font-bold text-sm rounded-xl transition">儲存修改</button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
