@@ -74,7 +74,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useMemo, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
     // 1. Supabase 初始化與連線設定
     const SUPABASE_URL = 'https://kpinvucugxsxjeyopezn.supabase.co';
@@ -120,49 +120,69 @@
     ];
     const MOCK_CHARS = [{ id: 'char-1', name: '奧古斯特', occupation: '教授', san: 65, max_san: 99, feature: '狂熱於古符號', is_active: true }];
 
-    const INITIAL_RECAPS = [
-      {
-        id: 'rec-1',
-        title: '沉落的印斯茅斯燈塔之役',
-        date: '2026-08-28',
-        tag: '經典逃脫',
-        summary: '軍醫精準投擲燃燒瓶封鎖旋轉階梯，調查員全員成功搭乘救生艇衝破潮汐逃脫。',
-        survivors: ['湯瑪斯 (軍醫)', '奧古斯特 (教授)'],
-        image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80'
-      },
-      {
-        id: 'rec-2',
-        title: '阿卡姆古林地的深淵低語',
-        date: '2026-08-14',
-        tag: '狂亂震撼',
-        summary: '四人誤闖古林石陣，在黎明破曉前夕驅車衝出封鎖，但一人意識陷入永久創傷。',
-        survivors: ['艾琳 (偵探)', '諾曼 (記者)'],
-        image: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80'
-      }
-    ];
+    // 日期 / 時間工具
+    const formatTimeLabel = (timeValue) => {
+      if (!timeValue) {return '';}
+      const [hourText,minuteText] = timeValue.split(':');
+      const hour = Number(hourText);
+      const period =
+        hour < 12
+          ? '上午'
+          : '下午';
+      const hour12 =
+        hour % 12 === 0
+          ? 12
+          : hour % 12;
+      return (
+        `${period} ` +
+        `${String(hour12).padStart(2, '0')}:` +
+        `${minuteText}`
+      );
+    };
 
-    const INITIAL_MY_CHARACTERS = [
-      {
-        id: 'char-1',
-        name: '奧古斯特·德雷斯',
-        occupation: '密大古典學教授',
-        san: 65,
-        max_san: 99,
-        feature: '隨身攜帶古代羊皮卷殘本，對古符號極具狂熱',
-        is_active: true
-      },
-      {
-        id: 'char-2',
-        name: '「渡鴉」伊蓮娜',
-        occupation: '黑市古董掮客',
-        san: 35,
-        max_san: 85,
-        feature: '聽覺敏銳，常在夜雨下水道聽見細微抓撓聲',
-        is_active: false
-      }
-    ];
+    const MAX_EVENT_YEAR = 2100;
+    const getTodayLocalDate = () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
 
-    // 3. 主應用程式 Component
+
+    // 目前年份
+    const getCurrentYear = () =>
+      new Date().getFullYear();
+
+    // 每 10 分鐘一個時段
+    const TIME_OPTIONS = [];
+    for (let hour = 0; hour < 24; hour++) {
+      for (const minute of [0, 10, 20, 30, 40, 50]) {
+        const value =
+          `${String(hour).padStart(2, '0')}:` +
+          `${String(minute).padStart(2, '0')}`;
+        TIME_OPTIONS.push({ value, label: formatTimeLabel(value)});
+      }
+    }
+
+    const isFourDigitDate = (value) => {
+      if (!value) {return false;}
+      const match =
+        /^(\d{4})-(\d{2})-(\d{2})$/
+          .exec(value);
+
+      if (!match) {return false;}
+      const year = Number(match[1]);
+      const currentYear = getCurrentYear();
+      return ( year >= currentYear && year <= MAX_EVENT_YEAR);
+    };
+
+    const hasValidYearLength = (value) => {
+      if (!value) {return true;}
+      const yearPart = value.split('-')[0];
+      return (yearPart.length <= 4);
+    };
+
     function App() {
       // --- 狀態管理 ---
       const [currentTab, setCurrentTab] = useState('lobby');
@@ -170,11 +190,15 @@
       const [profile, setProfile] = useState(null);
       const [accountRole, setAccountRole] = useState('member');
       const [portalView, setPortalView] = useState('member');
+      const [adminEventTab, setAdminEventTab] = useState('upcoming');
+      const [memberEventTab, setMemberEventTab] = useState('current');
+      const [memberHistoryLimit, setMemberHistoryLimit] = useState(10);
+      // Keeper 報名者詳細資料展開
+      const [expandedParticipantKey, setExpandedParticipantKey] = useState(null);
 
       // 資料集
       const [events, setEvents] = useState([]);
       const [characters, setCharacters] = useState([]);
-      const [recaps, setRecaps] = useState([]);
       const [isUsingMock, setIsUsingMock] = useState(false);
       const [settlingEvent, setSettlingEvent] = useState(null);
       const [growthNotes, setGrowthNotes] = useState({});
@@ -218,6 +242,20 @@
       const [selectedCharId, setSelectedCharId] = useState('');
       const [lockAlertMessage, setLockAlertMessage] = useState(null);
 
+      // 花絮圖片牆
+      const [galleryItems, setGalleryItems] = useState([]);
+      const [galleryLoading, setGalleryLoading] = useState(false);
+
+      const [showGalleryForm, setShowGalleryForm] = useState(false);
+      const [editingGalleryItem, setEditingGalleryItem] = useState(null);
+
+      const [galleryCaption, setGalleryCaption] = useState('');
+      const [galleryFile, setGalleryFile] = useState(null);
+      const [gallerySaving, setGallerySaving] = useState(false);
+
+      // Lightbox
+      const [galleryLightboxIndex, setGalleryLightboxIndex] = useState(null);
+
       // 表單狀態
       const [showAuthModal, setShowAuthModal] = useState(false);
       const [authMode, setAuthMode] = useState('login'); // login | signup
@@ -232,10 +270,30 @@
       const [authLoading, setAuthLoading] = useState(false);
       
       const [showNewEventModal, setShowNewEventModal] = useState(false);
-      const [newEventData, setNewEventData] = useState({ title: '', scenario_name: '', location: '', event_date: '', one_liner: '', min: 1, max: 4});
+      const [newEventData, setNewEventData] =
+        useState({
+          title: '',
+          scenario_name: '',
+          location: '',
+          event_date: getTodayLocalDate(),
+          event_time: '',
+          one_liner: '',
+          min: 1,
+          max: 4
+        });
+      const newEventTimeRef = useRef(null);
+      const newEventIntroRef = useRef(null);
 
       const [showNewCharForm, setShowNewCharForm] = useState(false);
       const [newChar, setNewChar] = useState({ name: '', occupation: '', san: 60, feature: '' });
+
+      // Keeper 危險操作確認
+      const [adminConfirmAction, setAdminConfirmAction] = useState(null);
+      const [adminActionLoading, setAdminActionLoading] = useState(false);
+
+      // 一般資料操作 Loading
+      const [actionLoading,setActionLoading] = useState(null);
+      const isActionLoading = (actionKey) => { return actionLoading === actionKey;};
 
       // 自訂通知 Toast（取代原生 alert）
       const [toast, setToast] = useState({ show: false, msg: '', type: 'info' });
@@ -406,8 +464,13 @@
       const handleUpdateProfile = async (e) => {
         e.preventDefault();
 
+        const actionKey = 'profile';
+
         if (!currentUser) { return showToast('請先登入。','error');}
         if (!profileForm.display_name.trim()) { return showToast('請輸入調查員暱稱。','error');}
+
+        if (isActionLoading(actionKey)) {return;}
+        setActionLoading(actionKey);
 
         try {
           const { data, error } =
@@ -433,6 +496,8 @@
         } catch (err) {
           console.error('會員資料更新錯誤:',err);
           showToast('更新失敗：' + err.message, 'error');
+        } finally {
+          setActionLoading(null);
         }
       };
 
@@ -448,10 +513,14 @@
       ]);
 
       useEffect(() => {
+        // 公開花絮
+        fetchGallery();
+        // 公開團務
+        fetchEvents();
         if (currentUser) {
-          console.log('👤 已登入，讀取會員資料:', currentUser.id);
+          console.log('👤 已登入，讀取會員資料:',currentUser.id);
           fetchProfile(currentUser);
-          fetchAllData();
+          fetchCharacters();
           fetchGrowthRecords();
         } else {
           console.log('👤 未登入');
@@ -459,77 +528,139 @@
           setAccountRole('member');
           setPortalView('member');
 
-          // 登出後一定要清空上一個人的角色卡
           setCharacters([]);
           setSelectedCharId('');
           setGrowthRecords([]);
-
-          // 公開場次仍然可以讀
-          fetchAllData();
         }
-
       }, [currentUser]);
 
-      const fetchAllData = async () => {
-        if (!supabaseClient) return useMockData();
+      // 支援鍵盤 操作 Lightbox
+      useEffect(() => {
+        if (galleryLightboxIndex === null) {return;}
+        const handleKeyDown = (e) => {
+          if (e.key === 'Escape') {closeGalleryLightbox();}
+          if (e.key === 'ArrowLeft') {showPreviousGallery();}
+          if (e.key === 'ArrowRight') {showNextGallery();}
+        };
+        window.addEventListener('keydown',handleKeyDown);
+        return () => {window.removeEventListener('keydown',handleKeyDown);};
+      }, [
+        galleryLightboxIndex,
+        galleryItems.length
+      ]);
+
+      // 讀取 Gallery
+      const fetchGallery = async () => {
+        if (!supabaseClient) {
+          setGalleryItems([]);
+          return;
+        }
+        setGalleryLoading(true);
         try {
-          // 抓場次
-          const { data: evts, error: eErr } = await supabaseClient
-          .from('events')
-          .select(`
-            *,
-            bookings(
-              user_id,
-              character_id,
-              status,
-              characters(
-                name,
-                occupation,
-                san
-              )
-            )
-          `);
+          const {data,error} =
+            await supabaseClient.rpc('get_public_gallery');
+          console.log('🖼 公開花絮:',data,error);
 
-        if (eErr) { throw eErr;}
-        console.log('events 查詢成功:', evts);
-          
-          const formattedEvts = evts.map(evt => ({
-            ...evt,
-            booked_investigators: (evt.bookings || []).map(b => ({
-              userId: b.user_id,
-              characterId: b.character_id,
-              charName: b.characters?.name || '無名',
-              occupation: b.characters?.occupation,
-              san: b.characters?.san,
-              status: b.status
-            }))
-          }));
-          setEvents(formattedEvts);
+          if (error) {throw error;}
 
-          // 若有登入，抓角色卡
-          if (currentUser) {
-            const { data: chars } = await supabaseClient.from('characters').select('*').eq('user_id', currentUser.id);
-            if (chars && chars.length > 0) {
-              setCharacters(chars);
-              const activeChar = chars.find(char => char.is_active === true) || chars[0];
-              setSelectedCharId(activeChar.id);
-            } else {
-              setCharacters([]);
-              setSelectedCharId('');
-            }
-          }
-          setIsUsingMock(false);
+          const formatted = (data || []).map(item => {
+              const {data: publicUrlData} =
+                supabaseClient.storage.from('trpg-gallery').getPublicUrl(item.image_path);
+
+              return {
+                id: item.id,
+                imagePath: item.image_path,
+                imageUrl: publicUrlData.publicUrl,
+                caption: item.caption || '',
+                createdAt: item.created_at
+              };
+            });
+
+          setGalleryItems(
+            formatted
+          );
         } catch (err) {
-          console.warn("使用本地展示資料:", err.message);
-          useMockData();
+          console.error('❌ 花絮讀取失敗:',err);
+          setGalleryItems([]);
+        } finally {
+          setGalleryLoading(false);
         }
       };
 
-      const useMockData = () => {
-        setEvents(MOCK_EVENTS);
-        setCharacters(MOCK_CHARS);
-        setSelectedCharId(MOCK_CHARS[0].id);
-        setIsUsingMock(true);
+      // Mock Data
+      const useMockEvents = () => {setEvents(MOCK_EVENTS);setIsUsingMock(true);};
+      const useMockCharacters = () => {setCharacters(MOCK_CHARS);setSelectedCharId(MOCK_CHARS[0]?.id || '');};
+
+      // 讀取團務
+      const fetchEvents = async () => {
+        // Supabase 完全不可用時才進入展示模式
+        if (!supabaseClient) { useMockEvents(); return false;}
+        try {
+          const {data: evts,error} =
+            await supabaseClient.rpc('get_events_dashboard');
+
+          if (error) {throw error;}
+          console.log('🔐 安全團務資料:',evts);
+
+          const formattedEvts = (evts || []).map( evt => ({...evt,
+              booked_investigators:
+                Array.isArray(evt.booked_investigators)
+                  ? evt.booked_investigators
+                  : [],
+              my_booking: evt.my_booking || null,
+              history_count: Number(evt.history_count || 0)
+            })
+          );
+
+          setEvents(formattedEvts);
+          setIsUsingMock(false);
+          return true;
+
+        } catch (err) {
+
+          /*重要：Supabase 查詢失敗時不要切到 Mock。否則正式網站網路短暫斷線時，玩家會突然看到假的團務資料。*/
+          console.error('❌ 團務資料讀取失敗:',err);
+          return false;
+
+        }
+      };
+
+      // 讀取登入會員自己的角色
+      const fetchCharacters = async () => {
+        if (!currentUser) {
+          setCharacters([]);
+          setSelectedCharId('');
+          return true;
+        }
+
+        if (!supabaseClient) {
+          useMockCharacters();
+          return false;
+        }
+
+        try {
+          const {data,error} =
+            await supabaseClient.from('characters').select('*').eq('user_id',currentUser.id);
+
+          if (error) {throw error;}
+
+          const chars = data || [];
+          console.log('🎭 我的角色:',chars);
+
+          setCharacters(chars);
+
+          if (chars.length > 0) {
+            const activeChar = chars.find(char => char.is_active === true) || chars[0];
+            setSelectedCharId(activeChar.id);
+          } else {
+            setSelectedCharId('');
+          }
+          return true;
+
+        } catch (err) {
+          console.error('❌ 角色資料讀取失敗:',err);
+          return false;
+        }
       };
 
       // 稱號設定
@@ -543,9 +674,13 @@
       };
 
       // 出戰角色
-      const handleSetActiveCharacter =
-        async (characterId) => {
+      const handleSetActiveCharacter = async (characterId) => {
+
+        const actionKey =`active:${characterId}`;
+        if (isActionLoading(actionKey)) {return;}
+
         if (!currentUser) { return showToast('請先登入。','error');}
+        setActionLoading(actionKey);
         try {
           const { data, error } =
             await supabaseClient.rpc('set_active_character',{p_character_id: characterId});
@@ -553,19 +688,119 @@
           if (error) {
             return showToast('設定失敗：' + error.message,'error');
           }
-          await fetchAllData();
+          await fetchCharacters();
           showToast('出戰調查員已更新。','success');
         } catch (err) {
           console.error('設定出戰角色錯誤:',err);
           showToast('設定失敗：' + err.message,'error');
+        } finally {
+          setActionLoading(null);
         }
       };
 
-      // 輔助判斷
+      const getMyBookingRecord = (evt) => {
+        if (!currentUser || !evt?.my_booking) { return null;}
+        return evt.my_booking;
+      };
+
       const isBooked = (evt) => {
-        if (!evt || !evt.booked_investigators) return false;
-        const myId = currentUser?.id || 'mock-user';
-        return evt.booked_investigators.some(i => i.userId === myId);
+        const booking = getMyBookingRecord(evt);
+        return ( booking?.status === 'confirmed');
+      };
+
+      const getEventJoinState = (evt) => {
+        const booking = getMyBookingRecord(evt);
+        const confirmedCount = evt.booked_investigators?.length || 0;
+        const isFull = confirmedCount >= Number(evt.max_players || 0);
+        const started = isEventStarted(evt.event_date);
+        const locked = checkIsLocked(evt.event_date, evt.lock_hours);
+
+        // 已被 Keeper 移出
+        if (booking?.status === 'removed') {
+          return {
+            key: 'removed',
+            canJoin: false,
+            label: 'Keeper 已移出',
+            message: '你已被 Keeper 移出此場團務，如需重新加入請直接聯絡 Keeper。',
+            className: 'bg-red-950 text-red-300 border-red-800'
+          };
+        }
+
+        // 已經在名單內
+        if (booking?.status === 'confirmed') {
+          return {
+            key: 'confirmed',
+            canJoin: false,
+            label: '已報名',
+            message: '你已經在本場調查小隊名單中。',
+            className: 'bg-purple-950 text-purple-300 border-purple-800'
+          };
+        }
+
+        // 已開團
+        if (started) {
+          return {
+            key: 'started',
+            canJoin: false,
+            label: '團務已開始',
+            message: '本場團務已開始，無法再接受新的報名。',
+            className: 'bg-stone-900 text-stone-400 border-stone-700'
+          };
+        }
+
+        // 已進鎖定期
+        if (locked) {
+          return {
+            key: 'locked',
+            canJoin: false,
+            label: '報名已鎖定',
+            message: `本場已進入開團前 ${evt.lock_hours || 36} 小時鎖定期。`,
+            className: 'bg-amber-950 text-amber-300 border-amber-800'
+          };
+        }
+
+        // 額滿
+        if (isFull) {
+          return {
+            key: 'full',
+            canJoin: false,
+            label: '名額已滿',
+            message: '本場調查小隊目前已額滿。',
+            className: 'bg-stone-900 text-stone-400 border-stone-700'
+          };
+        }
+
+        // 曾自行退出，可以重新加入
+        if (booking?.status === 'withdrawn') {
+          return {
+            key: 'withdrawn',
+            canJoin: true,
+            label: '重新加入',
+            message: '你曾自行退出此場，目前仍可重新加入。',
+            className: 'bg-copper/10 text-copper border-copper/40'
+          };
+        }
+
+        // 一般可報名
+        return {
+          key: 'available',
+          canJoin: true,
+          label: '報名調查',
+          message: '目前仍開放調查員加入。',
+          className: 'bg-emerald-950 text-emerald-300 border-emerald-800'
+        };
+
+      };
+
+      // 歷史狀態 Badge
+      const getBookingStatusMeta = (evt, booking) => {
+        if (!booking) { return {label: '未知',className: 'bg-stone-900 text-stone-400'};}
+        if (evt.status === 'cancelled') { return {label: '團務已取消',className: 'bg-red-950 text-red-300 border border-red-800'};}
+        if (evt.status === 'completed') { return {label: '已完成',className: 'bg-emerald-950 text-emerald-300 border border-emerald-800'};}
+        if (booking.status === 'withdrawn') { return { label: '已自行退出', className: 'bg-stone-900 text-stone-400 border border-stone-700'};}
+        if (booking.status === 'removed') { return {label: 'Keeper 已移出',className: 'bg-red-950 text-red-300 border border-red-800'};}
+        if (new Date(evt.event_date).getTime() <= Date.now()) { return {label: '等待結算',className: 'bg-amber-950 text-amber-300 border border-amber-800'};}
+        return {label: '已報名',className: 'bg-purple-950 text-purple-300 border border-purple-800'};
       };
 
       // 檢查是否處於 36 小時鎖定退團視窗內
@@ -804,6 +1039,9 @@
       /* 4. 報名與退團 */
       const handleJoinEvent = async (eventId) => {
 
+        const actionKey = `join:${eventId}`;
+        if (isActionLoading(actionKey)) {return;}
+
         if (!currentUser) {
           setShowAuthModal(true);
           return showToast( '請先登入調查員系統。', 'error');
@@ -819,6 +1057,8 @@
         const booked = evt.booked_investigators?.length || 0;
         if (booked >= evt.max_players) { return showToast('很可惜，本場目前已額滿。','error');}
 
+        setActionLoading(actionKey);
+
         try {
           const { data, error} = await supabaseClient.rpc('join_event', { p_event_id: eventId, p_character_id: selectedCharId});
           console.log('🎟 join_event result:', data);
@@ -828,18 +1068,23 @@
             console.error('報名失敗:',error);
             return showToast( error.message,'error');
           }
-          await fetchAllData();
+          await fetchEvents();
           // 避免 modal 保留舊的 event state
           setActiveEvent(null);
           showToast('契約立定，報名成功！','success');
         } catch (err) {
           console.error('報名發生錯誤:',err);
           showToast('系統錯誤：' + err.message,'error');
+        } finally {
+          setActionLoading(null);
         }
       };
 
 
       const handleLeaveEvent = async (evt) => {
+
+        const actionKey =`leave:${evt?.id}`;
+        if (isActionLoading(actionKey)) { return;}
 
         if (!currentUser) { return showToast('請先登入。','error');}
         if (!evt?.id) { return showToast('場次資料錯誤。','error');}
@@ -852,6 +1097,8 @@
           return;
         }
 
+        setActionLoading(actionKey);
+
         try {
           const { data, error} = await supabaseClient.rpc('leave_event',{ p_event_id: evt.id});
           console.log('🚪 leave_event result:', data);
@@ -862,7 +1109,7 @@
             setLockAlertMessage(error.message);
             return;
           }
-          await fetchAllData();
+          await fetchEvents();
 
           setActiveEvent(null);
           showToast('已自名冊註銷。','info');
@@ -870,61 +1117,109 @@
         } catch (err) {
           console.error('退團發生錯誤:',err);
           showToast('系統錯誤：' + err.message,'error');
+        } finally {
+          setActionLoading(null);
         }
+      };
+
+      const isEventStarted = (eventDateStr) => {
+        return ( new Date(eventDateStr).getTime() <= Date.now());
       };
 
       /* 2. 新增角色卡 */
       const handleCreateChar = async (e) => {
         e.preventDefault();
-        if (!newChar.name || !newChar.occupation) return;
-        
-        const payload = {
-          name: newChar.name,
-          occupation: newChar.occupation,
-          san: Number(newChar.san) || 50,
-          max_san: 99,
-          feature: newChar.feature || '無',
-          is_active: false
-        };
 
-        if (!isUsingMock && supabaseClient && currentUser) {
-          payload.user_id = currentUser.id;
+        const actionKey = 'create-char';
 
-          const { data: createdChar, error } =
+        if (isActionLoading(actionKey)) {return;}
+        if (!currentUser) {
+          setShowAuthModal(true);
+          return showToast('請先登入後再建立角色卡。','error');
+        }
+        if (!supabaseClient) {
+          return showToast('目前無法連接會員系統。','error');
+        }
+
+        const name = newChar.name.trim();
+        const occupation = newChar.occupation.trim();
+        const san = Number(newChar.san);
+
+        if (!name) {
+          return showToast('請輸入角色姓名。','error');
+        }
+        if (!occupation) {
+          return showToast('請輸入角色職業。','error');
+        }
+        if (!Number.isInteger(san) || san < 1 || san > 99
+        ) {
+          return showToast('SAN 必須介於 1 ～ 99。','error');
+        }
+
+        setActionLoading(actionKey);
+
+        try {
+          const payload = {
+            user_id: currentUser.id,
+            name,
+            occupation,
+            san,
+            max_san: 99,
+            feature:
+              newChar.feature.trim() ||
+              '無',
+            is_active: false
+          };
+
+          const {data: createdChar,error} =
             await supabaseClient
               .from('characters')
               .insert(payload)
               .select()
               .single();
 
-          if (error) {
-            console.error('建立角色失敗:', error);
-            return showToast('新增失敗：' + error.message, 'error');
-          }
+          if (error) { throw error;}
 
-          // 第一張角色自動設為出戰
-          if (
-            characters.length === 0 &&
-            createdChar?.id
-          ) {
-            const { error: activeError } =
-              await supabaseClient.rpc('set_active_character',{p_character_id: createdChar.id});
+          // 第一張角色自動出戰
+          if ( characters.length === 0 && createdChar?.id) {
+            const { error: activeError} =
+              await supabaseClient.rpc(
+                'set_active_character',
+                {p_character_id: createdChar.id}
+              );
+
             if (activeError) {
               console.error('設定初始出戰角色失敗:',activeError);
             }
           }
 
-          await fetchAllData();
-        } else {
-          setCharacters(prev => [...prev, payload]);
+          await fetchCharacters();
+
+          // 建立完成後清空表單
+          setNewChar({
+            name: '',
+            occupation: '',
+            san: 60,
+            feature: ''
+          });
+
+          setShowNewCharForm(false);
+          showToast(`角色卡 [${name}] 建立成功！`,'success');
+
+        } catch (err) {
+          console.error('建立角色失敗:',err);
+          showToast('新增失敗：' + err.message,'error');
+        } finally {
+          setActionLoading(null);
         }
-        showToast(`角色卡 [${newChar.name}] 建立成功！`, 'success');
-        setShowNewCharForm(false);
       };
 
       /* 3. 發布新團務 (Keeper) */
       const handleCreateEvent = async (e) => {
         e.preventDefault();
+
+        const actionKey = 'create-event';
+        if (isActionLoading(actionKey)) {return;}
 
         // 前端第一層防護
         if (!currentUser) { return showToast( '請先登入 Keeper 帳號。', 'error'); }
@@ -932,11 +1227,22 @@
 
         if (!newEventData.title.trim()) { return showToast('請輸入場次標題。', 'error');}
         if (!newEventData.scenario_name.trim()) {return showToast('請輸入劇本名稱。', 'error');}
-        if (!newEventData.event_date) {return showToast('請選擇開團時間。', 'error');}
+        if (!newEventData.event_date) {return showToast('請選擇開團日期。', 'error');}
+        if (!newEventData.event_time) {return showToast('請選擇開團時間。', 'error');}
+        if (!isFourDigitDate(newEventData.event_date)) {return showToast(`開團年份必須介於 ${getCurrentYear()} ～ ${MAX_EVENT_YEAR} 年。`,'error');}
+
+        setActionLoading(actionKey);
 
         try {
           const minPlayers = Number(newEventData.min);
           const maxPlayers = Number(newEventData.max);
+          const eventDateTime = new Date(`${newEventData.event_date}T${newEventData.event_time}:00`);
+
+          if ( Number.isNaN(eventDateTime.getTime())) {
+            return showToast('開團日期或時間格式不正確。','error');}
+          if (eventDateTime.getTime() <= Date.now()) {
+            return showToast('開團時間必須晚於現在。','error');}
+
           if (
             !Number.isInteger(minPlayers) ||
             !Number.isInteger(maxPlayers) ||
@@ -957,9 +1263,7 @@
             title: newEventData.title.trim(),
             scenario_name: newEventData.scenario_name.trim(),
             location: newEventData.location.trim(),
-            event_date: new Date(
-              newEventData.event_date
-            ).toISOString(),
+            event_date: eventDateTime.toISOString(),
             one_liner: newEventData.one_liner.trim(),
 
             min_players: minPlayers,
@@ -992,37 +1296,58 @@
           showToast(`團務「${data.title}」發布成功！`,'success');
 
           // 清空表單
-          setNewEventData({title: '',scenario_name: '',location: '',event_date: '',one_liner: '', min: 1, max: 4});
+          setNewEventData({title: '',scenario_name: '',location: '',event_date: getTodayLocalDate(),event_time: '',one_liner: '', min: 1, max: 4});
           setShowNewEventModal(false);
 
           // 重新抓 Supabase 真實資料
-          await fetchAllData();
+          await fetchEvents();
 
         } catch (err) {
           console.error('建立團務發生錯誤:',err);
 
           showToast('系統錯誤：' + err.message,'error');
+        } finally {
+          setActionLoading(null);
         }
       };
 
       const handleAdminKick = async (eventId, userId) => {
+
+        const actionKey =`kick:${eventId}:${userId}`;
+        if (isActionLoading(actionKey)) {return;}
+
         if (accountRole !== 'admin') {return showToast('只有 Keeper 可以移除玩家。','error');}
+
+        setActionLoading(actionKey);
+
         try {
-          const { error } = await supabaseClient
-            .from('bookings')
-            .delete()
-            .eq('event_id', eventId)
-            .eq('user_id', userId);
-          console.log('🚪 Keeper 移除玩家:', eventId, userId, error);
+          const { data, error } =
+            await supabaseClient.rpc(
+              'admin_remove_participant',
+              {
+                p_event_id: eventId,
+                p_user_id: userId
+              }
+            );
+          console.log('🚪 Keeper 移除玩家:',data,error);
 
-          if (error) { return showToast( '移除失敗：' + error.message, 'error');}
-          await fetchAllData();
+          if (error) {return showToast('移除失敗：' + error.message,'error');}
+          await fetchEvents();
+          setExpandedParticipantKey(null);
+          showToast('已將該名調查員移出隊伍，紀錄將保留。','success');
 
-          showToast('已將該名調查員移出隊伍。','success');
         } catch (err) {
           console.error('移除玩家錯誤:',err);
           showToast('移除失敗：' + err.message,'error');
+        } finally {
+          setActionLoading(null);
         }
+      };
+
+      // 玩家資訊展開
+      const toggleParticipantDetails = (eventId,userId) => {
+        const key = `${eventId}-${userId}`;
+        setExpandedParticipantKey(current => current === key ? null : key);
       };
 
       // 事後KP加入玩家
@@ -1063,14 +1388,19 @@
       };
 
       // Keeper 手動加入玩家
-      const handleAdminAddParticipant =
-        async (characterId) => {
+      const handleAdminAddParticipant = async (characterId) => {
+
+        const actionKey = `add:${characterId}`;
+        if (isActionLoading(actionKey)) {return;}
+
         if (
           !addingParticipantEvent ||
           !characterId
         ) {
           return;
         }
+
+        setActionLoading(actionKey);
 
         try {
           const { data, error } =
@@ -1088,13 +1418,33 @@
           setAddingParticipantEvent(null);
           setMemberSearch('');
           setMemberSearchResults([]);
-          await fetchAllData();
+          await fetchEvents();
           showToast('已將角色加入本場團務。', 'success');
 
         } catch (err) {
           console.error('Keeper 加入玩家錯誤:',err);
           showToast('加入失敗：' + err.message,'error');
+        } finally {
+          setActionLoading(null);
         }
+      };
+
+      // 確認動作的彈窗
+      const handleOpenAdminConfirm = (type,evt) => {
+        if (accountRole !== 'admin') {
+          return;
+        }
+        if (type === 'delete' && !canPermanentlyDeleteEvent(evt)) {
+          if (evt.status === 'completed') {
+            return showToast('已完成結算的團務不能永久刪除。','error');
+          }
+          return showToast('此團務已有玩家紀錄，請先取消團務。','error');
+        }
+        setAdminConfirmAction({type,event: evt});
+      };
+      const handleCloseAdminConfirm = () => {
+        if (adminActionLoading) {return;}
+        setAdminConfirmAction(null);
       };
 
       // 取消團務
@@ -1106,38 +1456,75 @@
           return showToast('已完成結算的團務不能取消。','error');
         }
 
+        setAdminActionLoading(true);
+
         try {
           const { data, error } = await supabaseClient.rpc('cancel_event', {p_event_id: evt.id});
           console.log('🚫 取消團務:',data,error);
           if (error) {return showToast('取消失敗：' + error.message,'error');}
 
-          await fetchAllData();
+          setAdminConfirmAction(null);
+
+          await fetchEvents();
           showToast('團務已取消，歷史資料仍會保留。','success');
         } catch (err) {
           console.error('取消團務錯誤:',err);
           showToast('取消失敗：' + err.message,'error');
+        } finally {
+          setAdminActionLoading(false);
         }
       };
 
-      const handleAdminDeleteEvent = async (eventId) => {
+      const handleAdminDeleteEvent = async (evt) => {
         if (accountRole !== 'admin') {
           return showToast('只有 Keeper 可以刪除場次。','error');
         }
+        if (!canPermanentlyDeleteEvent(evt)) {
+          return showToast(
+            evt.status === 'completed'
+              ? '已完成結算的團務不能永久刪除。'
+              : '此團務已有玩家紀錄，請先取消團務。',
+            'error'
+          );
+        }
+
+        setAdminActionLoading(true);
+
         try {
-          const { error } = await supabaseClient.from('events').delete().eq('id', eventId);
-          console.log('🗑 刪除場次:', eventId, error);
-          if (error) { return showToast('刪除失敗：' + error.message,'error');}
-          await fetchAllData();
-          showToast('場次已從資料庫刪除。','success');
+          const {data,error} = await supabaseClient.rpc('delete_event_permanently',{p_event_id: evt.id});
+          console.log('🗑 永久刪除場次:', data, error);
+
+          if (error) { return showToast('刪除失敗：' + error.message, 'error');}
+
+          setAdminConfirmAction(null);
+          setExpandedParticipantKey(null);
+
+          await fetchEvents();
+          showToast('場次已永久刪除。','success');
+
         } catch (err) {
           console.error('刪除場次錯誤:',err);
           showToast('刪除失敗：' + err.message,'error');
+        } finally {
+          setAdminActionLoading(false);
         }
       };
 
       const canPermanentlyDeleteEvent = (evt) => {
-        const bookingCount = evt.booked_investigators?.length || 0;
-        return ( bookingCount === 0 && evt.status !== 'completed' );
+        if (!evt) {
+          return false;
+        }
+        // 已完成團務永久保留
+        if (evt.status === 'completed') {
+          return false;
+        }
+        // 已取消團務可直接永久刪除
+        if (evt.status === 'cancelled') {
+          return true;
+        }
+        // 尚未取消的團務必須完全沒有任何 booking 歷史
+        const historyCount = Number(evt.history_count || 0);
+        return historyCount === 0;
       };
 
       // 編輯團務
@@ -1149,21 +1536,27 @@
           scenario_name: '',
           location: '',
           event_date: '',
+          event_time: '',
           one_liner: '',
           min: 1,
           max: 4
         });
+      const editEventTimeRef = useRef(null);
+      const editEventIntroRef = useRef(null);
       
       // 日期轉換工具
-      const toDatetimeLocal = (dateString) => {
+      const toLocalDateParts = (dateString) => {
         const date = new Date(dateString);
-        const offset =
-          date.getTimezoneOffset() * 60000;
-        return new Date(
-          date.getTime() - offset
-        )
-          .toISOString()
-          .slice(0, 16);
+        const pad = value => String(value).padStart(2, '0');
+        return {
+          date:
+            `${date.getFullYear()}-` +
+            `${pad(date.getMonth() + 1)}-` +
+            `${pad(date.getDate())}`,
+          time:
+            `${pad(date.getHours())}:` +
+            `${pad(date.getMinutes())}`
+        };
       };
 
       const handleOpenEditEvent = (evt) => {
@@ -1171,13 +1564,14 @@
           return showToast(`本場已進入開團前 ${evt.lock_hours || 36} 小時鎖定期，無法修改。`,'error');
         }
 
+        const dateParts = toLocalDateParts(evt.event_date);
         setEditingEvent(evt);
         setEditEventData({
           title: evt.title || '',
           scenario_name: evt.scenario_name || '',
           location: evt.location || '',
-          event_date:
-            toDatetimeLocal(evt.event_date),
+          event_date: dateParts.date,
+          event_time: dateParts.time,
           one_liner: evt.one_liner || '',
           min: evt.min_players || 1,
           max: evt.max_players || 4
@@ -1196,9 +1590,15 @@
       // 儲存編輯
       const handleUpdateEvent = async (e) => {
         e.preventDefault();
+
         if (!editingEvent) return;
+        
+        const actionKey =`update-event:${editingEvent.id}`;
+        if (isActionLoading(actionKey)) {return;}
+
         const minPlayers = Number(editEventData.min);
         const maxPlayers = Number(editEventData.max);
+
 
         if (
           !Number.isInteger(minPlayers) ||
@@ -1214,7 +1614,21 @@
         if (!editEventData.title.trim()) {return showToast('請輸入場次標題。', 'error');}
         if (!editEventData.scenario_name.trim()) {return showToast('請輸入劇本名稱。', 'error');}
         if (!editEventData.location.trim()) {return showToast('請輸入集合地點。', 'error');}
-        if (!editEventData.event_date) {return showToast('請選擇開團時間。', 'error');}
+        if (!editEventData.event_date) {return showToast('請選擇開團日期。','error');}
+        if (!isFourDigitDate(editEventData.event_date)) {return showToast(`開團年份必須介於 ${getCurrentYear()} ～ ${MAX_EVENT_YEAR} 年。`,'error');}
+        if (!editEventData.event_time) {return showToast('請選擇開團時間。','error');}
+
+        const editedEventDateTime = new Date(
+          `${editEventData.event_date}` +
+          `T${editEventData.event_time}:00`
+        );
+        if (Number.isNaN(editedEventDateTime.getTime())) {return showToast('開團日期或時間格式不正確。','error');}
+
+        const editLockHours = Number(editingEvent.lock_hours || 36);
+        const minimumEditTime = Date.now() + editLockHours * 60 * 60 * 1000;
+        if (editedEventDateTime.getTime() <= minimumEditTime) {return showToast(`修改後的開團時間必須距離現在超過 ${editLockHours} 小時。`,'error');}
+
+        setActionLoading(actionKey);
 
         try {
           const { data, error } =
@@ -1225,7 +1639,7 @@
                 p_title: editEventData.title.trim(),
                 p_scenario_name: editEventData.scenario_name.trim(),
                 p_location: editEventData.location.trim(),
-                p_event_date: new Date(editEventData.event_date).toISOString(),
+                p_event_date: editedEventDateTime.toISOString(),
                 p_one_liner: editEventData.one_liner.trim(),
                 p_min_players: minPlayers,
                 p_max_players: maxPlayers
@@ -1236,12 +1650,14 @@
           if (error) {return showToast('修改失敗：' + error.message, 'error');}
           setEditingEvent(null);
 
-          await fetchAllData();
+          await fetchEvents();
           showToast('團務修改成功！','success');
 
         } catch (err) {
           console.error('修改團務錯誤:',err);
           showToast('修改失敗：' + err.message,'error');
+        } finally {
+          setActionLoading(null);
         }
       };
 
@@ -1258,6 +1674,10 @@
 
       const handleSettleEvent = async (e) => {
         e.preventDefault();
+
+        const actionKey = `settle:${settlingEvent?.id}`;
+        if (isActionLoading(actionKey)) {return;}
+
         if (!settlingEvent) return;
 
         const growths =
@@ -1270,21 +1690,36 @@
 
         if ( growths.some( item => !item.growth_note) ) { return showToast('請替每位參團角色填寫成長紀錄。','error');}
 
-        const { data, error } =
-          await supabaseClient.rpc(
-            'settle_event',
-            {
-              p_event_id: settlingEvent.id,
-              p_growths: growths
-            }
-          );
-        console.log('📜 團務結算:',data,error);
+        setActionLoading(actionKey);
 
-        if (error) { return showToast('結算失敗：' + error.message,'error');}
-        setSettlingEvent(null);
-        setGrowthNotes({});
-        await fetchAllData();
-        showToast('團務結算完成，角色成長紀錄已發放。','success' );
+        try {
+          const {data,error} =
+            await supabaseClient.rpc(
+              'settle_event',
+              {
+                p_event_id: settlingEvent.id,
+                p_growths: growths
+              }
+            );
+
+          if (error) {return showToast('結算失敗：' + error.message,'error');}
+
+          setSettlingEvent(null);
+          setGrowthNotes({});
+
+          await Promise.all([
+            fetchEvents(),
+            fetchGrowthRecords()
+          ]);
+
+          showToast('團務結算完成，角色成長紀錄已發放。','success');
+
+        } catch (err) {
+          console.error('團務結算錯誤:',err);
+          showToast('結算失敗：' + err.message,'error');
+        } finally {
+          setActionLoading(null);
+        }
       };
 
       // 讀取成長紀錄
@@ -1293,8 +1728,7 @@
         const { data, error } =
           await supabaseClient.from('character_growth_records')
             .select(`
-              id, event_id, character_id, user_id, growth_note, created_at,
-              events( title, scenario_name, event_date)
+              id, event_id, character_id, user_id, growth_note, created_at
             `)
             .eq('user_id', currentUser.id)
             .order('created_at', {ascending: false});
@@ -1321,6 +1755,10 @@
       const handleUpdateCharacter = async (e) => {
         e.preventDefault();
         if ( !currentUser || !editingCharacter) { return;}
+
+        const actionKey = `update-char:${editingCharacter.id}`;
+        if (isActionLoading(actionKey)) {return;}
+
         const san = Number(editCharacterData.san);
         const maxSan = Number(editCharacterData.max_san);
 
@@ -1335,26 +1773,359 @@
           return showToast( '請確認 SAN 與最大 SAN 設定。','error');
         }
 
-        if (
-          !editCharacterData.name.trim()
-        ) {
+        if (!editCharacterData.name.trim()) {
           return showToast('請輸入角色姓名。','error');
         }
+        if (!editCharacterData.occupation.trim()) {
+          return showToast('請輸入角色職業。','error');
+        }
 
-        const payload = {
-          name: editCharacterData.name.trim(),
-          occupation: editCharacterData.occupation.trim(),
-          san,max_san: maxSan,
-          feature: editCharacterData.feature.trim()
-        };
+        setActionLoading(actionKey);
 
-        const { error } = await supabaseClient.from('characters').update(payload).eq('id', editingCharacter.id).eq('user_id',currentUser.id);
-        console.log('✏️ 更新角色:', payload, error);
-        if (error) { return showToast('角色更新失敗：' + error.message, 'error');}
-        setEditingCharacter(null);
-        await fetchAllData();
-        showToast('角色卡已更新。','success');
+        try {
+          const payload = {
+            name: editCharacterData.name.trim(),
+            occupation: editCharacterData.occupation.trim(),
+            san,max_san: maxSan,
+            feature: editCharacterData.feature.trim()
+          };
+
+          const { error } = await supabaseClient.from('characters').update(payload).eq('id', editingCharacter.id).eq('user_id',currentUser.id);
+          if (error) {throw error;}
+
+          setEditingCharacter(null);
+          await fetchCharacters();
+          showToast('✏️ 角色已更新。','success');
+
+        } catch (err) {
+          console.error('角色更新失敗:',err);
+            showToast('角色更新失敗：' + err.message, 'error');
+          } finally {
+            setActionLoading(null);
+          }
       };
+
+      // 取得使用者的報名紀錄
+      const myEventRecords = currentUser ? events.filter( evt => getMyBookingRecord(evt)) : [];
+      // Keeper 團務分類
+      const sortEventsByDate = (items,direction = 'asc') => {
+        return [...items].sort((a, b) => {
+            const timeA = new Date(a.event_date).getTime();
+            const timeB = new Date(b.event_date).getTime();
+            return direction === 'desc'
+              ? timeB - timeA
+              : timeA - timeB;
+          }
+        );
+      };
+
+      // Member 目前預約
+      const currentMemberEvents = myEventRecords.filter(evt => {
+        const booking = getMyBookingRecord(evt);
+        return (
+          booking?.status === 'confirmed' &&
+          evt.status !== 'completed' &&
+          evt.status !== 'cancelled'
+        );
+      })
+      .sort((a, b) =>
+          new Date(a.event_date).getTime() -
+          new Date(b.event_date).getTime()
+      );
+
+      // Member 歷史紀錄
+      const historyMemberEvents = myEventRecords.filter(evt => {
+        const booking = getMyBookingRecord(evt);
+        return (
+          booking?.status === 'withdrawn' ||
+          booking?.status === 'removed' ||
+          evt.status === 'completed' ||
+          evt.status === 'cancelled'
+        );
+      })
+      .sort((a, b) =>
+          new Date(b.event_date).getTime() -
+          new Date(a.event_date).getTime()
+      );
+
+      // 目前要顯示哪一組
+      const activeMemberEvents = memberEventTab === 'history'
+        ? historyMemberEvents.slice(0,memberHistoryLimit)
+        : currentMemberEvents;
+
+
+      // 團務分類
+      const adminEventSections = [
+        {
+          key: 'upcoming',
+          title: '即將進行',
+          icon: '🕯️',
+          description: '尚未開始的開放團務',
+          items: sortEventsByDate(events.filter( evt => evt.status === 'open' && !isEventStarted(evt.event_date)))
+        },
+        {
+          key: 'settlement',
+          title: '等待結算',
+          icon: '📜',
+          description: '已到開團時間，等待 Keeper 完成結算',
+          items: sortEventsByDate(events.filter( evt => evt.status === 'open' && isEventStarted(evt.event_date)),'desc')
+        },
+        {
+          key: 'completed',
+          title: '已完成',
+          icon: '✓',
+          description: '已完成團務結算',
+          items: sortEventsByDate(events.filter( evt => evt.status === 'completed'),'desc')
+        },
+        {
+          key: 'cancelled',
+          title: '已取消',
+          icon: '🚫',
+          description: '已取消但仍保留歷史資料',
+          items: sortEventsByDate(events.filter( evt => evt.status === 'cancelled'),'desc')
+        }
+      ];
+
+      const activeAdminEventSection = adminEventSections.find(section => section.key === adminEventTab) || adminEventSections[0];
+
+      const getAdminEventStatusMeta = (evt) => {
+        if (evt.status === 'cancelled') {
+          return {
+            label: '已取消',
+            className: 'bg-red-950 text-red-300 border-red-800'
+          };
+        }
+        if (evt.status === 'completed') {
+          return {
+            label: '已完成',
+            className: 'bg-emerald-950 text-emerald-300 border-emerald-800'
+          };
+        }
+        if (isEventStarted(evt.event_date)
+        ) {
+          return {
+            label: '等待結算',
+            className: 'bg-amber-950 text-amber-300 border-amber-800'
+          };
+        }
+        if (checkIsLocked(evt.event_date,evt.lock_hours)
+        ) {
+          return {
+            label: '名單已鎖定',
+            className: 'bg-purple-950 text-purple-300 border-purple-800'
+          };
+        }
+        return {
+          label: '招募中',
+          className: 'bg-copper/10 text-copper border-copper/40'
+        };
+      };
+
+      const handleOpenNewGallery = () => {
+        if (accountRole !== 'admin') {
+          return;
+        }
+        setEditingGalleryItem(null);
+        setGalleryCaption('');
+        setGalleryFile(null);
+        setShowGalleryForm(true);
+      };
+      const handleOpenEditGallery = (item) => {
+        if (accountRole !== 'admin') {
+          return;
+        }
+        setEditingGalleryItem(item);
+        setGalleryCaption(item.caption || '');
+        setGalleryFile(null);
+        setShowGalleryForm(true);
+      };
+      const handleCloseGalleryForm = () => {
+        if (gallerySaving) {
+          return;
+        }
+        setShowGalleryForm(false);
+        setEditingGalleryItem(null);
+        setGalleryCaption('');
+        setGalleryFile(null);
+      };
+      const handleSaveGallery = async (e) => {
+        e.preventDefault();
+
+        if (!currentUser || accountRole !== 'admin') {
+          return showToast('只有 Keeper 可以管理花絮。','error');
+        }
+
+        const caption = galleryCaption.trim();
+        if (!caption) {
+          return showToast('請輸入圖片摘要。','error');
+        }
+
+        // 新增時一定要選圖片
+        if (!editingGalleryItem && !galleryFile) {
+          return showToast('請選擇要上傳的圖片。','error');
+        }
+
+        const allowedTypes = [
+          'image/jpeg',
+          'image/png',
+          'image/webp',
+          'image/avif'
+        ];
+
+        if (galleryFile) {
+          if (!allowedTypes.includes(galleryFile.type)) {
+            return showToast('圖片僅支援 JPG、PNG、WebP、AVIF。', 'error');
+          }
+          if (galleryFile.size > 5 * 1024 * 1024) {
+            return showToast('單張圖片不可超過 5MB。','error');
+          }
+        }
+
+        setGallerySaving(true);
+
+        let newImagePath = null;
+        try {
+          // 如果有新圖片，先上傳
+          if (galleryFile) {
+            const extensionMap = {
+              'image/jpeg': 'jpg',
+              'image/png': 'png',
+              'image/webp': 'webp',
+              'image/avif': 'avif'
+            };
+
+            const extension = extensionMap[galleryFile.type] || 'jpg';
+
+            newImagePath = `gallery/${crypto.randomUUID()}.${extension}`;
+
+            const {error: uploadError} =
+              await supabaseClient.storage.from('trpg-gallery')
+                .upload(newImagePath,galleryFile,{cacheControl: '3600',upsert: false}
+                );
+
+            if (uploadError) {throw uploadError;}
+          }
+
+          // 編輯
+          if (editingGalleryItem) {
+            const payload = {caption,updated_at: new Date().toISOString()};
+            if (newImagePath) {payload.image_path = newImagePath;}
+
+            const {error: updateError} =
+              await supabaseClient.from('gallery_items').update(payload).eq('id',editingGalleryItem.id);
+            if (updateError) {
+              if (newImagePath) {
+                await supabaseClient.storage.from('trpg-gallery').remove([newImagePath]);
+              }
+              throw updateError;
+            }
+
+            if (newImagePath && editingGalleryItem.imagePath) {
+              const {error: removeOldError} =
+                await supabaseClient.storage.from('trpg-gallery').remove([editingGalleryItem.imagePath]);
+              if (removeOldError) {console.warn('舊圖片清除失敗:',removeOldError);
+              }
+            }
+            showToast('花絮已更新。','success');
+          }
+
+          // 新增
+          else {
+            const {error: insertError} =
+              await supabaseClient.from('gallery_items').insert({
+                  image_path: newImagePath,
+                  caption
+                });
+
+            if (insertError) {
+              // DB 新增失敗 刪除 Storage 圖片
+              if (newImagePath) {
+                await supabaseClient.storage.from('trpg-gallery').remove([newImagePath]);
+              }
+              throw insertError;
+            }
+            showToast('花絮圖片已發布。','success');
+          }
+
+          setShowGalleryForm(false);
+          setEditingGalleryItem(null);
+          setGalleryCaption('');
+          setGalleryFile(null);
+          await fetchGallery();
+        } catch (err) {
+          console.error('花絮儲存失敗:',err);
+          showToast('花絮儲存失敗：' + err.message,'error');
+        } finally {
+          setGallerySaving(false);
+        }
+      };
+
+      // 刪除功能
+      const handleDeleteGallery = async (item) => {
+        if (accountRole !== 'admin') {
+          return;
+        }
+        const confirmed = window.confirm('確定要永久刪除這張花絮圖片嗎？');
+        if (!confirmed) {
+          return;
+        }
+
+        try {
+          // 先刪資料庫
+          const {error: deleteError} =
+            await supabaseClient.from('gallery_items').delete().eq('id',item.id);
+          if (deleteError) {throw deleteError;}
+
+          // 再清 Storage
+          if (item.imagePath) {
+            const {error: storageError} =
+              await supabaseClient.storage.from('trpg-gallery').remove([item.imagePath]);
+            if (storageError) {console.warn('Storage 圖片清除失敗:',storageError);}
+          }
+          await fetchGallery();
+          showToast('花絮已刪除。','success');
+        } catch (err) {
+          console.error('刪除花絮失敗:',err);
+          showToast('刪除失敗：' + err.message,'error');
+        }
+      };
+
+      //lightbox 切換
+      const openGalleryLightbox = (index) => {setGalleryLightboxIndex(index);};
+      const closeGalleryLightbox = () => {setGalleryLightboxIndex(null);};
+      const showPreviousGallery = () => {
+        setGalleryLightboxIndex(
+          current => {
+            if (current === null) {
+              return null;
+            }
+            return (
+              current - 1 +
+              galleryItems.length
+            ) % galleryItems.length;
+          }
+        );
+      };
+      const showNextGallery = () => {
+        setGalleryLightboxIndex(
+          current => {
+            if (current === null) {
+              return null;
+            }
+            return (
+              current + 1
+            ) % galleryItems.length;
+          }
+        );
+      };
+
+      // 目前開啟團務的報名狀態
+      const activeEventJoinState = activeEvent ? getEventJoinState(activeEvent) : null;
+      // 是否已進入退團鎖定期
+      const activeEventLeaveLocked = activeEvent ? checkIsLocked(activeEvent.event_date,activeEvent.lock_hours) : false;
+      // 團務是否已經開始
+      const activeEventStarted = activeEvent ? isEventStarted(activeEvent.event_date) : false;
+
 
       return (
         <div className="min-h-screen flex flex-col justify-between text-parchment font-sans">
@@ -1442,10 +2213,11 @@
                 {/* 卡片網格 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {events.filter(evt => evt.status === 'open').map((evt) => {
+                    const joinState = getEventJoinState(evt);
                     const booked = evt.booked_investigators?.length || 0;
                     const isFull = booked >= evt.max_players;
-                    const hasJoined = isBooked(evt);
                     const locked = checkIsLocked(evt.event_date, evt.lock_hours);
+                    const started = isEventStarted(evt.event_date);
 
                     return (
                       <div
@@ -1458,7 +2230,11 @@
                             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-purple-950 text-purple-300 border border-purple-700/50">
                               {evt.scenario_name}
                             </span>
-                            {locked ? (
+                            {started ? (
+                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-950 text-amber-300 border border-amber-800">
+                                ⏳ 等待結算
+                              </span>
+                            ) : locked ? (
                               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-950/80 text-red-300 border border-red-800">
                                 🔒 鎖定中
                               </span>
@@ -1519,15 +2295,44 @@
                           </div>
 
                           <div className="pt-2 flex justify-between items-center text-xs text-mutedText">
-                            {hasJoined ? (
-                              <span className="text-emerald-400 font-bold">✓ 你已在隊伍中</span>
-                            ) : (
-                              <span>點擊查看名單與報名 →</span>
-                            )}
-                            <span className="text-copper">主持: {evt.keeper_name}</span>
+                            <span>
+                              {joinState.key === 'confirmed'
+                                ? (
+                                  <span className="text-emerald-400 font-bold">
+                                    ✓ 你已在隊伍中
+                                  </span>
+                                )
+                                : joinState.key === 'removed'
+                                  ? (
+                                    <span className="text-red-400 font-bold">
+                                      Keeper 已將你移出本場
+                                    </span>
+                                  )
+                                  : joinState.key === 'withdrawn'
+                                    ? (
+                                      <span className="text-copper font-bold">
+                                        ↩ 目前可以重新加入
+                                      </span>
+                                    )
+                                    : !joinState.canJoin
+                                      ? (
+                                        <span>
+                                          {joinState.label}
+                                        </span>
+                                      )
+                                      : (
+                                        <span>
+                                          點擊查看名單與報名 →
+                                        </span>
+                                      )
+                              }
+                            </span>
+
+                            <span className="text-copper">
+                              主持: {evt.keeper_name}
+                            </span>
                           </div>
                         </div>
-
                       </div>
                     );
                   })}
@@ -1536,7 +2341,6 @@
               </div>
             )}
 
-            {}
             {currentTab === 'archive' && (
               <div className="space-y-10">
                 <div className="bg-cardBg rounded-3xl p-8 border border-purple-900/40 shadow-modern-card space-y-4">
@@ -1563,55 +2367,84 @@
                   </div>
                 </div>
 
-                {/* 歷史花絮清單 */}
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between border-b border-purple-900/40 pb-3">
-                    <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
-                      <span>📜</span> 歷史調查紀錄與花絮
-                    </h3>
-                    <span className="text-sm text-mutedText">共 {recaps.length} 份絕密檔案</span>
+                {/* 花絮圖片牆 */}
+                <div className="space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-900/40 pb-3">
+                    <div>
+                      <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
+                        <span>📷</span>
+                        調查花絮
+                      </h3>
+                      <p className="text-xs text-mutedText mt-1">
+                        記錄那些值得留存在密斯卡託尼克檔案館中的片段。
+                      </p>
+                    </div>
+                    {accountRole === 'admin' && (
+                      <button onClick={handleOpenNewGallery} className="px-4 py-2 bg-copper hover:bg-copperDark text-black rounded-xl text-sm font-bold transition">
+                        ＋ 新增花絮
+                      </button>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {recaps.map(r => (
-                      <div key={r.id} className="bg-cardBg rounded-3xl overflow-hidden border border-purple-900/30 shadow-modern-card flex flex-col">
-                        <div className="relative h-48 overflow-hidden">
-                          <img 
-                            src={r.image} 
-                            alt={r.title} 
-                            className="w-full h-full object-cover grayscale contrast-125 opacity-70 hover:scale-105 transition duration-500" 
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-cardBg via-transparent to-transparent"></div>
-                          <span className="absolute top-4 right-4 bg-black/70 text-copper text-xs px-3 py-1 rounded-full border border-copper/40">
-                            {r.date}
-                          </span>
-                        </div>
-                        <div className="p-6 space-y-3 flex-1 flex flex-col justify-between">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800">
-                                {r.tag}
-                              </span>
-                              <h4 className="text-lg font-bold text-parchment">{r.title}</h4>
-                            </div>
-                            <p className="text-sm text-mutedText leading-relaxed italic mt-2">
-                              "{r.summary}"
-                            </p>
-                          </div>
-
-                          <div className="pt-4 border-t border-purple-950 flex items-center justify-between text-xs">
-                            <span className="text-emerald-400 font-medium">生還：{r.survivors.join('、')}</span>
-                          </div>
-                        </div>
+                  {galleryLoading ? (
+                    <div className="py-12 text-center text-sm text-mutedText">
+                      正在翻閱絕密影像檔案...
+                    </div>
+                  ) : galleryItems.length === 0 ? (
+                    <div className="bg-cardBg border border-dashed border-purple-900 rounded-3xl p-10 text-center">
+                      <div className="text-4xl">
+                        🕯️
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <div className="text-sm font-bold text-parchment mt-3">
+                        尚無公開花絮
+                      </div>
+                      <div className="text-xs text-mutedText mt-2">
+                        Keeper 發布的調查影像將保存在這裡。
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="max-h-[980px] md:max-h-[850px] overflow-y-auto custom-scrollbar pr-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {galleryItems.map((item, index) => (
+                            <div key={item.id} onClick={() => openGalleryLightbox(index)}
+                              className="group bg-cardBg border border-purple-900/40 rounded-2xl overflow-hidden cursor-pointer hover:border-copper/50 transition shadow-modern-card">
 
+                              {/* 固定 4:3 圖片比例 */}
+                              <div className="relative aspect-[4/3] bg-void overflow-hidden">
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.caption}
+                                  loading="lazy"
+                                  className="w-full h-full object-cover transition duration-500 group-hover:scale-105"/>
+                                {accountRole === 'admin' && (
+                                  <div className="absolute top-3 right-3 flex gap-2">
+                                    <button type="button" onClick={e => {e.stopPropagation(); handleOpenEditGallery(item);}}
+                                      className="px-2.5 py-1.5 rounded-lg bg-black/80 text-copper text-xs border border-copper/40 hover:bg-black">
+                                      ✏️
+                                    </button>
+                                    <button type="button" onClick={e => {e.stopPropagation();handleDeleteGallery(item);}}
+                                      className="px-2.5 py-1.5 rounded-lg bg-red-950/90 text-red-300 text-xs border border-red-800 hover:bg-red-900">
+                                      🗑
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="p-4">
+                                <p className="text-sm text-mutedText leading-relaxed line-clamp-2">
+                                  {item.caption}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {}
             {currentTab === 'portal' && (
               <div className="space-y-8">
                 
@@ -1741,11 +2574,18 @@
                             >
                               取消
                             </button>
-                            <button
-                              type="submit"
-                              className="px-5 py-2 bg-copper hover:bg-copperDark text-black font-bold rounded-xl text-sm transition"
+                            <button type="submit"
+                              disabled={isActionLoading('create-char')}
+                              className={`px-5 py-2 font-bold rounded-xl text-sm transition ${
+                                isActionLoading('create-char')
+                                  ? 'bg-stone-800 text-stone-500 cursor-wait'
+                                  : 'bg-copper hover:bg-copperDark text-black'
+                              }`}
                             >
-                              儲存卡片
+                              {isActionLoading('create-char')
+                                ? '建立中...'
+                                : '儲存卡片'
+                              }
                             </button>
                           </div>
                         </form>
@@ -1775,14 +2615,21 @@
                                     </span>
                                   </div>
                                 </div>
-                                <button disabled={c.is_active} onClick={() => handleSetActiveCharacter(c.id)}
+                                <button
+                                  disabled={c.is_active || isActionLoading(`active:${c.id}`)}
+                                  onClick={() => handleSetActiveCharacter(c.id)}
                                   className={`text-xs px-3 py-1 rounded-xl font-bold transition ${
                                     c.is_active
                                       ? 'bg-copper text-black cursor-default'
-                                      : 'bg-void text-mutedText hover:text-white border border-purple-900'
+                                      : isActionLoading(`active:${c.id}`)
+                                        ? 'bg-stone-900 text-stone-500 cursor-wait'
+                                        : 'bg-void text-mutedText hover:text-white border border-purple-900'
                                   }`}
                                 >
-                                  {c.is_active ? '✓ 出戰中' : '設為出戰'}
+                                  {c.is_active ? '✓ 出戰中' : isActionLoading(`active:${c.id}`)
+                                      ? '設定中...'
+                                      : '設為出戰'
+                                  }
                                 </button>
                               </div>
 
@@ -1823,37 +2670,129 @@
                       </div>
                     </div>
 
-                    {/* 我的出團記錄 */}
+                    {/* 我的預約與出團記錄 */}
                     <div className="space-y-4">
-                      <h3 className="text-xl font-bold text-parchment border-b border-purple-900/40 pb-3 flex items-center gap-2">
-                        <span>⛺</span> 我的預約與出團記錄
-                      </h3>
+                      <div className="border-b border-purple-900/40 pb-3">
+                        <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
+                          <span>⛺</span>
+                          我的預約與出團記錄
+                        </h3>
+                        <p className="text-xs text-mutedText mt-1">
+                          管理目前參加中的團務，以及查看過往調查紀錄。
+                        </p>
+                      </div>
+
+                      {/* Member 紀錄 Tabs */}
+                      <div className="flex items-center gap-2 bg-void p-1.5 rounded-2xl border border-purple-950 w-fit">
+                        <button type="button" onClick={() => setMemberEventTab('current')}
+                          className={`px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
+                            memberEventTab === 'current'
+                              ? 'bg-mystic text-white'
+                              : 'text-mutedText hover:text-white'
+                          }`}
+                        >
+                          <span>
+                            目前預約
+                          </span>
+                          <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-black/30 flex items-center justify-center text-[11px]">
+                            {currentMemberEvents.length}
+                          </span>
+                        </button>
+
+                        <button type="button" onClick={() => {setMemberEventTab('history');
+                            // 每次重新進歷史 先回到前 10 筆
+                            setMemberHistoryLimit(10);
+                          }}
+                          className={`px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
+                            memberEventTab === 'history'
+                              ? 'bg-copper/20 text-copper border border-copper/40'
+                              : 'text-mutedText hover:text-copper'
+                          }`}
+                        >
+                          <span>
+                            歷史紀錄
+                          </span>
+                          <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-black/30 flex items-center justify-center text-[11px]">
+                            {historyMemberEvents.length}
+                          </span>
+                        </button>
+                      </div>
+
                       <div className="space-y-3">
-                        {events.filter(e => isBooked(e)).length === 0 ? (
-                          <div className="bg-cardBg p-6 rounded-2xl text-center text-mutedText text-sm border border-purple-950">
-                            你目前尚未報名任何調查任務，歡迎前往「跑團大廳」挑選合適場次！
+                        {activeMemberEvents.length === 0 ? (
+                          <div className="bg-cardBg p-8 rounded-2xl text-center border border-purple-950">
+                            <div className="text-3xl mb-3">
+                              {memberEventTab === 'history' ? '📜' : '🕯️'}
+                            </div>
+                            <div className="text-sm font-bold text-parchment">
+                              {memberEventTab === 'history' ? '目前尚無歷史紀錄' : '目前沒有進行中的預約'}
+                            </div>
+                            <div className="text-xs text-mutedText mt-2">
+                              {memberEventTab === 'history' ? '完成、取消、退出或被移出的團務會保存在這裡。' : '歡迎前往「跑團大廳」尋找下一場調查任務。'}
+                            </div>
                           </div>
                         ) : (
-                          events.filter(e => isBooked(e)).map(e => (
-                            <div key={e.id} className="bg-cardBg p-5 rounded-2xl border border-purple-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                              <div>
-                                <span className="text-xs text-copper bg-copper/10 px-2.5 py-0.5 rounded-md border border-copper/30 font-medium">
-                                  {e.scenario_name}
-                                </span>
-                                <h4 className="text-lg font-bold text-parchment mt-1">{e.title}</h4>
-                                <p className="text-xs text-mutedText mt-1">
-                                  📅 {new Date(e.event_date).toLocaleString('zh-TW')} | 📍 {e.location}
-                                </p>
+                          activeMemberEvents.map(e => {
+                            const myBooking = getMyBookingRecord(e);
+                            const statusMeta = getBookingStatusMeta(e,myBooking);
+                            return (
+                              <div key={e.id} className="bg-cardBg p-5 rounded-2xl border border-purple-900/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs text-copper bg-copper/10 px-2.5 py-0.5 rounded-md border border-copper/30 font-medium">
+                                      {e.scenario_name}
+                                    </span>
+                                    <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${statusMeta.className}`}>
+                                      {statusMeta.label}
+                                    </span>
+                                  </div>
+                                  <h4 className="text-lg font-bold text-parchment mt-2">
+                                    {e.title}
+                                  </h4>
+                                  <p className="text-xs text-mutedText mt-1">
+                                    📅{' '}
+                                    {new Date( e.event_date).toLocaleString('zh-TW')}
+                                    {' | '}
+                                    📍 {e.location}
+                                  </p>
+
+                                  {myBooking?.charName && (
+                                    <p className="text-xs text-mutedText mt-1">
+                                      🎭 角色：
+                                      <span className="text-copper">
+                                        {myBooking.charName}
+                                      </span>
+                                    </p>
+
+                                  )}
+                                </div>
+
+                                {memberEventTab === 'current' && myBooking?.status === 'confirmed' && (
+                                  <button onClick={() => {setActiveEvent(e); setLockAlertMessage(null);}} className="px-4 py-2 bg-void hover:bg-cardHover border border-purple-800 text-sm font-medium text-parchment rounded-xl transition">
+                                    查看小隊名冊
+                                  </button>
+                                )}
                               </div>
-                              <button
-                                onClick={() => { setActiveEvent(e); setLockAlertMessage(null); }}
-                                className="px-4 py-2 bg-void hover:bg-cardHover border border-purple-800 text-sm font-medium text-parchment rounded-xl transition"
-                              >
-                                查看小隊名冊
-                              </button>
-                            </div>
-                          ))
+                            );
+                          })
+
                         )}
+
+                        {memberEventTab === 'history' && memberHistoryLimit < historyMemberEvents.length && (
+                          <div className="pt-2 text-center">
+                            <button type="button" onClick={() => setMemberHistoryLimit(current => current + 10)}
+                              className="px-5 py-2.5 bg-void hover:bg-cardHover border border-purple-900 text-sm text-copper rounded-xl transition"
+                            >
+                              顯示更多紀錄
+                              <span className="text-mutedText ml-2 text-xs">
+                                ({Math.min(memberHistoryLimit, historyMemberEvents.length)}
+                                {' / '}
+                                {historyMemberEvents.length})
+                              </span>
+                            </button>
+                          </div>
+                        )}
+
                       </div>
                     </div>
                   </div>
@@ -1870,141 +2809,322 @@
                         <p className="text-xs text-mutedText mt-1">檢視報名者資料、管理調查小隊並完成角色成長結算。</p>
                       </div>
 
-                      <button
-                        onClick={() => setShowNewEventModal(true)}
-                        className="px-4 py-2 bg-crimson hover:bg-crimsonDark text-white rounded-xl text-sm font-bold shadow-glow-purple transition"
-                      >
+                      <button onClick={() => setShowNewEventModal(true)} className="px-4 py-2 bg-crimson hover:bg-crimsonDark text-white rounded-xl text-sm font-bold shadow-glow-purple transition">
                         + 發布新團務場次
                       </button>
                     </div>
 
+                    {/* Keeper 團務分類 Tabs */}
+                    <div className="overflow-x-auto custom-scrollbar">
+                      <div className="flex items-center gap-2 min-w-max pb-2">
+                        {adminEventSections.map(section => {
+                            const isActive = adminEventTab === section.key;
+                            return (
+                              <button key={section.key} type="button" onClick={() => setAdminEventTab(section.key)}
+                                className={`px-4 py-2.5 rounded-xl border text-sm font-bold transition flex items-center gap-2
+                                  ${
+                                    isActive
+                                      ? section.key ===
+                                        'settlement'
+                                        ? 'bg-amber-950/60 border-amber-700 text-amber-300'
+                                        : section.key ===
+                                          'completed'
+                                          ? 'bg-emerald-950/60 border-emerald-700 text-emerald-300'
+                                          : section.key ===
+                                            'cancelled'
+                                            ? 'bg-red-950/60 border-red-800 text-red-300'
+                                            : 'bg-mysticDark/60 border-mystic text-purple-200'
+                                      : 'bg-void border-purple-950 text-mutedText hover:text-parchment hover:border-purple-800'
+                                  }
+                                `}
+                              >
+                                <span>{section.icon}</span>
+                                <span>{section.title}</span>
+                                <span
+                                  className={`min-w-[22px] h-[22px] px-1.5 rounded-full flex items-center justify-center text-[11px]
+                                    ${
+                                      isActive
+                                        ? 'bg-black/30'
+                                        : 'bg-stone-900'
+                                    }
+                                  `}
+                                >
+                                  {section.items.length}
+                                </span>
+                              </button>
+                            );
+                          }
+                        )}
+                      </div>
+                    </div>
+
                     {/* 場次與名冊管理 */}
                     <div className="space-y-6">
-                      {events.map(evt => (
-                        <div key={evt.id} className="bg-cardBg rounded-3xl p-6 border border-purple-900/40 space-y-4">
-                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-purple-950">
+                      {/* 目前選中的團務分類 */}
+                      {activeAdminEventSection && (
+                        <section className="space-y-4">
+                          <div className="flex items-center justify-between gap-3">
                             <div>
-                              <h4 className="text-lg font-bold text-parchment">{evt.title}</h4>
-                              <p className="text-xs text-mutedText mt-0.5">
-                                時間：{new Date(evt.event_date).toLocaleString()} | 地點：{evt.location}
+                              <h4 className="text-base font-bold text-parchment flex items-center gap-2">
+                                <span>{activeAdminEventSection.icon}</span>
+                                {activeAdminEventSection.title}
+                                <span className="text-xs text-mutedText font-normal">
+                                  ({activeAdminEventSection.items.length})
+                                </span>
+                              </h4>
+                              <p className="text-xs text-mutedText mt-1">
+                                {activeAdminEventSection.description}
                               </p>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                disabled={isEventChangeLocked( evt.event_date,evt.lock_hours)}
-                                onClick={() =>  handleOpenEditEvent(evt)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                                  isEventChangeLocked( evt.event_date,evt.lock_hours)
-                                    ? 'bg-stone-900 text-stone-600 cursor-not-allowed'
-                                    : 'bg-purple-950 hover:bg-purple-900 border border-purple-600 text-purple-300'
-                                }`}
-                              >
-                                {isEventChangeLocked( evt.event_date,evt.lock_hours ) ? '🔒 團務已鎖定' : '✏️ 修改團務'}
-                              </button>
-                              {evt.status === 'open' && (
-                                <button onClick={() => handleOpenSettlement(evt)} className="px-3.5 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-600 text-emerald-300 rounded-xl text-xs font-bold transition">
-                                  📜 團務結算
-                                </button>
-                              )}
-                              {evt.status === 'open' && (
-                                <button onClick={() => handleAdminCancelEvent(evt)} className="px-3 py-1.5 bg-red-950/40 hover:bg-red-950 border border-red-900 text-red-300 rounded-xl text-xs font-bold transition">
-                                  🚫 取消團務
-                                </button>
-                              )}
-                              <button disabled={!canPermanentlyDeleteEvent(evt)}
-                                onClick={() => handleAdminDeleteEvent(evt.id)} className={`px-3 py-1.5 rounded-xl text-xs transition ${
-                                  canPermanentlyDeleteEvent(evt)
-                                    ? 'bg-stone-900 hover:bg-red-950 text-stone-400 hover:text-red-300'
-                                    : 'bg-stone-950 text-stone-700 cursor-not-allowed'
-                                }`}
-                              >
-                                🗑 永久刪除
-                              </button>
-                            </div>
                           </div>
 
-                          {/* 報名者聯絡清單 */}
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-xs font-semibold text-copper">
-                                報名調查員清單
-                                ({evt.booked_investigators.length} / {evt.max_players} 人)：
-                              </span>
-
-                              {evt.status === 'open' && (
-                                <button disabled={evt.booked_investigators.length >= evt.max_players}
-                                  onClick={() => handleOpenAddParticipant(evt)}
-                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                                    evt.booked_investigators.length >=
-                                    evt.max_players
-                                      ? 'bg-stone-950 text-stone-700 cursor-not-allowed'
-                                      : 'bg-copper/10 hover:bg-copper/20 border border-copper/40 text-copper'
-                                  }`}
-                                >
-                                  {evt.booked_investigators.length >=
-                                  evt.max_players
-                                    ? '席位已滿'
-                                    : '＋ Keeper 加入角色'
-                                  }
-                                </button>
-                              )}
+                          {activeAdminEventSection.items.length === 0 ? (
+                            <div className="bg-void/40 border border-dashed border-purple-950 rounded-2xl p-8 text-center">
+                              <div className="text-3xl mb-3">
+                                {activeAdminEventSection.icon}
+                              </div>
+                              <div className="text-sm font-bold text-parchment">
+                                此分類目前沒有團務
+                              </div>
+                              <div className="text-xs text-mutedText mt-2">
+                                {activeAdminEventSection.description}
+                              </div>
                             </div>
-
-                            {evt.booked_investigators.length === 0 ? (
-                              <div className="text-xs text-mutedText py-2 italic">尚無調查員加入。</div>
-                            ) : (
-                              <div className="divide-y divide-purple-950 border border-purple-950 rounded-2xl overflow-hidden bg-void/50">
-                                {evt.booked_investigators.map(inv => {
-                                  const contact = adminProfiles[inv.userId];
+                          ) : (
+                            <div className="space-y-6">
+                              {activeAdminEventSection.items.map(evt => {
+                                    const eventStatus = getAdminEventStatusMeta(evt);
 
                                   return (
-
-                                    <div key={inv.userId} className="p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
-                                      <div>
-                                        <span className="text-sm font-bold text-parchment">{inv.charName}</span>
-                                        <span className="text-copper ml-2">({inv.occupation} • SAN: {inv.san})</span>
-                                        <div className="text-mutedText mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                                          {contact?.email && (
-                                            <span>
-                                              Email：
-                                              <strong className="text-blue-300">
-                                                {contact.email}
-                                              </strong>
+                                    <div key={evt.id} className="bg-cardBg rounded-3xl p-6 border border-purple-900/40 space-y-4">
+                                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-purple-950">
+                                        <div>
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <h4 className="text-lg font-bold text-parchment">
+                                              {evt.title}
+                                            </h4>
+                                            <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-bold ${eventStatus.className}`}>
+                                              {eventStatus.label}
                                             </span>
+                                          </div>
+                                          <p className="text-xs text-mutedText mt-0.5">
+                                            時間：{new Date(evt.event_date).toLocaleString()} | 地點：{evt.location}
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            disabled={evt.status !== 'open' || isEventChangeLocked( evt.event_date,evt.lock_hours)}
+                                            onClick={() =>  handleOpenEditEvent(evt)}
+                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                                              evt.status !== 'open' || isEventChangeLocked( evt.event_date,evt.lock_hours)
+                                                ? 'bg-stone-900 text-stone-600 cursor-not-allowed'
+                                                : 'bg-purple-950 hover:bg-purple-900 border border-purple-600 text-purple-300'
+                                            }`}
+                                          >
+                                            {evt.status === 'completed'
+                                              ? '✓ 已結算' : evt.status === 'cancelled'
+                                                ? '🚫 已取消' : isEventChangeLocked( evt.event_date,evt.lock_hours)
+                                                  ? '🔒 團務已鎖定'
+                                                  : '✏️ 修改團務'
+                                            }
+                                          </button>
+                                          {evt.status === 'open' && isEventStarted( evt.event_date) && (
+                                            <button onClick={() => handleOpenSettlement(evt)} className="px-3.5 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-600 text-emerald-300 rounded-xl text-xs font-bold transition">
+                                              📜 團務結算
+                                            </button>
                                           )}
-                                          {contact?.line_id && (
-                                            <span>
-                                              LINE：
-                                              <strong className="text-emerald-400">
-                                                {contact.line_id}
-                                              </strong>
-                                            </span>
+                                          {evt.status === 'open' && (
+                                            <button onClick={() => handleOpenAdminConfirm('cancel',evt)} className="px-3 py-1.5 bg-red-950/40 hover:bg-red-950 border border-red-900 text-red-300 rounded-xl text-xs font-bold transition">
+                                              🚫 取消團務
+                                            </button>
                                           )}
-                                          {contact?.phone && (
-                                            <span>
-                                              手機：
-                                              <strong className="text-amber-400">
-                                                {contact.phone}
-                                              </strong>
-                                            </span>
-                                          )}
+                                          <button disabled={!canPermanentlyDeleteEvent(evt)}
+                                            onClick={() => handleOpenAdminConfirm('delete',evt)} className={`px-3 py-1.5 rounded-xl text-xs transition ${
+                                              canPermanentlyDeleteEvent(evt)
+                                                ? 'bg-stone-900 hover:bg-red-950 text-stone-400 hover:text-red-300'
+                                                : 'bg-stone-950 text-stone-700 cursor-not-allowed'
+                                            }`}
+                                          >
+                                            🗑 永久刪除
+                                          </button>
                                         </div>
                                       </div>
-                                      <button
-                                        onClick={() => handleAdminKick(evt.id, inv.userId)}
-                                        className="px-3 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 rounded-lg text-xs transition border border-red-900/60"
-                                      >
-                                        踢出隊伍
-                                      </button>
+
+                                      {/* 報名者聯絡清單 */}
+                                      <div className="space-y-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                          <span className="text-xs font-semibold text-copper">
+                                            報名調查員清單
+                                            {' '}
+                                            ({evt.booked_investigators.length}
+                                            {' / '}
+                                            {evt.max_players} 人)
+                                          </span>
+
+                                          {evt.status === 'open' && (
+                                            <button
+                                              disabled={
+                                                evt.booked_investigators.length >=
+                                                evt.max_players
+                                              }
+                                              onClick={() => handleOpenAddParticipant(evt)}
+                                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                                                evt.booked_investigators.length >=
+                                                evt.max_players
+                                                  ? 'bg-stone-950 text-stone-700 cursor-not-allowed'
+                                                  : 'bg-copper/10 hover:bg-copper/20 border border-copper/40 text-copper'
+                                              }`}
+                                            >
+                                              {evt.booked_investigators.length >=
+                                              evt.max_players
+                                                ? '席位已滿'
+                                                : '＋ Keeper 加入角色'
+                                              }
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        {evt.booked_investigators.length === 0 ? (
+                                          <div className="text-xs text-mutedText py-4 italic bg-void/40 border border-dashed border-purple-950 rounded-2xl text-center">
+                                            尚無調查員加入。
+                                          </div>
+
+                                        ) : (
+                                          <div className="space-y-2">
+                                            {evt.booked_investigators.map( inv => {
+                                                const contact = adminProfiles[inv.userId];
+                                                const participantKey = `${evt.id}-${inv.userId}`;
+                                                const isExpanded = expandedParticipantKey === participantKey;
+
+                                                return (
+                                                  <div key={participantKey}
+                                                    className={`rounded-2xl border transition
+                                                      ${
+                                                        isExpanded
+                                                          ? 'bg-cardHover border-copper/40'
+                                                          : 'bg-void/50 border-purple-950 hover:border-purple-800'
+                                                      }
+                                                    `}
+                                                  >
+
+                                                    {/* ==== 精簡玩家列 ==== */}
+                                                    <button type="button" onClick={() => toggleParticipantDetails(evt.id,inv.userId)} className="w-full p-3.5 flex items-center justify-between gap-4 text-left">
+                                                      <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                          <span className="text-sm font-bold text-parchment">
+                                                            {inv.charName}
+                                                          </span>
+                                                          <span className="text-[11px] text-copper">
+                                                            {inv.occupation}
+                                                          </span>
+                                                          <span className="text-[11px] text-emerald-300 bg-emerald-950 border border-emerald-800 px-2 py-0.5 rounded-lg">
+                                                            SAN {inv.san}
+                                                          </span>
+                                                        </div>
+                                                        <div className="text-[11px] text-mutedText mt-1">
+                                                          玩家：
+                                                          <span className="text-parchment ml-1">
+                                                            {contact?.display_name || contact?.email || '未設定暱稱'}
+                                                          </span>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center border text-xs transition
+                                                        ${
+                                                          isExpanded
+                                                            ? 'bg-copper/10 border-copper/40 text-copper'
+                                                            : 'bg-black/30 border-purple-950 text-mutedText'
+                                                        }
+                                                      `}
+                                                      >
+                                                        {isExpanded ? '▲' : '▼'}
+                                                      </div>
+                                                    </button>
+
+                                                    {/* ====展開詳細資料==== */}
+                                                    {isExpanded && (
+                                                      <div className="px-4 pb-4">
+                                                        <div className="border-t border-purple-950 pt-4 space-y-4">
+                                                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+                                                            {/* Email */}
+                                                            <div className="bg-void rounded-xl p-3 border border-purple-950">
+                                                              <div className="text-[10px] uppercase tracking-wider text-mutedText">
+                                                                Email
+                                                              </div>
+                                                              <div className="text-xs text-blue-300 mt-1 break-all">
+                                                                {contact?.email || '未提供'}
+                                                              </div>
+                                                            </div>
+
+                                                            {/* LINE */}
+                                                            <div className="bg-void rounded-xl p-3 border border-purple-950">
+                                                              <div className="text-[10px] uppercase tracking-wider text-mutedText">
+                                                                LINE
+                                                              </div>
+                                                              <div className="text-xs text-emerald-400 mt-1 break-all">
+                                                                {contact?.line_id || '未提供'}
+                                                              </div>
+                                                            </div>
+
+                                                            {/* Phone */}
+                                                            <div className="bg-void rounded-xl p-3 border border-purple-950">
+                                                              <div className="text-[10px] uppercase tracking-wider text-mutedText">
+                                                                手機
+                                                              </div>
+                                                              <div className="text-xs text-amber-400 mt-1">
+                                                                {contact?.phone || '未提供'}
+                                                              </div>
+                                                            </div>
+                                                          </div>
+
+                                                          {/* Keeper 操作 */}
+                                                          {evt.status === 'open' && (
+                                                            <div className="flex justify-end">
+                                                              <button type="button"
+                                                                disabled={isActionLoading(`kick:${evt.id}:${inv.userId}`)}
+                                                                onClick={() => handleAdminKick(evt.id,inv.userId)}
+                                                                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition border ${
+                                                                  isActionLoading(`kick:${evt.id}:${inv.userId}`)
+                                                                    ? 'bg-stone-900 border-stone-700 text-stone-500 cursor-wait'
+                                                                    : 'bg-red-950/60 hover:bg-red-900 text-red-300 border-red-900/60'
+                                                                }`}
+                                                              >
+                                                                {isActionLoading(`kick:${evt.id}:${inv.userId}`)
+                                                                  ? '移出中...'
+                                                                  : '🚪 踢出隊伍'
+                                                                }
+                                                              </button>
+                                                            </div>
+                                                          )}
+
+                                                          {evt.status !== 'open' && (
+                                                            <div className="text-[11px] text-mutedText text-right">
+                                                              此團務已結束，名冊僅供歷史查閱。
+                                                            </div>
+                                                          )}
+
+                                                        </div>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                );
+                                              }
+                                            )}
+
+                                          </div>
+
+                                        )}
+
+                                      </div>
                                     </div>
                                   );
-
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                                }
+                              )}
+                            </div>
+                          )}
+                        </section>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2013,7 +3133,6 @@
 
           </main>
 
-          {}
           {activeEvent && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
               <div className="bg-cardBg border border-copper/50 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -2082,6 +3201,18 @@
                   )}
                 </div>
 
+                {/* 目前會員的報名狀態 */}
+                {currentUser && activeEventJoinState && (
+                  <div className={`rounded-2xl border px-4 py-3 ${activeEventJoinState.className}`}>
+                    <div className="text-sm font-bold">
+                      {activeEventJoinState.label}
+                    </div>
+                    <div className="text-xs opacity-80 mt-1 leading-relaxed">
+                      {activeEventJoinState.message}
+                    </div>
+                  </div>
+                )}
+
                 {/* 退團鎖定提示 */}
                 {lockAlertMessage && (
                   <div className="p-4 bg-red-950/60 border border-red-600 rounded-2xl text-xs text-red-200 leading-relaxed animate-pulse">
@@ -2091,68 +3222,159 @@
 
                 {/* 報名行動區 */}
                 <div className="pt-4 border-t border-purple-950 space-y-4">
-                  {isBooked(activeEvent) ? (
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-emerald-950/30 p-4 rounded-2xl border border-emerald-900">
-                      <span className="text-sm text-emerald-300 font-semibold">✓ 你已簽署契約並加入本場調查小隊</span>
-                      <button
-                        onClick={() => handleLeaveEvent(activeEvent)}
-                        className="px-4 py-2 bg-red-950 hover:bg-red-900 text-red-300 border border-red-700 rounded-xl text-xs font-bold transition"
-                      >
-                        退出本次調查
-                      </button>
-                    </div>
-                  ) : (
+                  {/* ====尚未登入==== */}
+                  {!currentUser ? (
                     <div className="space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                        <label className="text-sm text-copper font-medium whitespace-nowrap">指派調查員角色：</label>
-                        <select
-                          value={selectedCharId}
-                          onChange={(e) => setSelectedCharId(e.target.value)}
-                          className="w-full bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
-                        >
-                          {characters.map(c => (
-                            <option key={c.id} value={c.id}>
-                              {c.name} ({c.occupation}) - SAN: {c.san}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="bg-copper/5 border border-copper/30 rounded-2xl p-4 text-xs text-mutedText leading-relaxed">
+                        登入調查員帳號後，即可選擇角色並加入本場調查。
                       </div>
-
-                      <div className="flex justify-end gap-3 pt-2">
-                        <button
-                          onClick={() => setActiveEvent(null)}
-                          className="px-4 py-2.5 text-sm text-mutedText hover:text-white"
-                        >
+                      <div className="flex justify-end gap-3">
+                        <button type="button" onClick={() => setActiveEvent(null)} className="px-4 py-2.5 text-sm text-mutedText hover:text-white">
                           返回
                         </button>
-                        <button
-                          disabled={
-                            checkIsLocked(activeEvent.event_date,activeEvent.lock_hours) ||
-                            activeEvent.booked_investigators.length >= activeEvent.max_players
-                          }
+                        <button type="button"
+                          onClick={() => {
+                            setActiveEvent(null);
+                            setShowAuthModal(true);
+                          }}
+                          className="px-6 py-2.5 bg-copper hover:bg-copperDark text-black rounded-xl text-sm font-bold transition shadow-glow-purple"
+                        >
+                          登入後報名
+                        </button>
+                      </div>
+                    </div>
+
+                  /* ====已經報名==== */
+                  ) : activeEventJoinState?.key === 'confirmed' ? (
+                    <div className="space-y-3">
+                      <div className="bg-emerald-950/30 p-4 rounded-2xl border border-emerald-900">
+                        <div className="text-sm text-emerald-300 font-semibold">
+                          ✓ 你已簽署契約並加入本場調查小隊
+                        </div>
+                      </div>
+
+                      {/* 團務已開始 */}
+                      {activeEventStarted ? (
+                        <div className="bg-amber-950/40 border border-amber-800 rounded-2xl p-4">
+                          <div className="text-sm font-bold text-amber-300">
+                            ⏳ 團務已開始
+                          </div>
+                          <div className="text-xs text-amber-200/80 mt-1 leading-relaxed">
+                            本場調查已經開始，目前正在等待 Keeper 完成團務結算，無法自行退出。
+                          </div>
+                        </div>
+
+                      /* 進入退團鎖定期 */
+                      ) : activeEventLeaveLocked ? (
+                        <div className="bg-red-950/50 border border-red-800 rounded-2xl p-4">
+                          <div className="text-sm font-bold text-red-300">
+                            🔒 已進入退團鎖定期
+                          </div>
+                          <div className="text-xs text-red-200/80 mt-1 leading-relaxed">
+                            本場已進入開團前{' '}
+                            {activeEvent.lock_hours || 36}
+                            {' '}小時鎖定期，因此無法自行退出。
+                          </div>
+                          <div className="text-xs text-red-200 mt-2 font-medium">
+                            如有特殊狀況需要退出，請直接聯絡 Keeper。
+                          </div>
+                        </div>
+                      ) : (
+                        /* 尚未鎖定，可正常退出 */
+                        <div className="flex justify-end">
+                          <button type="button" 
+                            disabled={isActionLoading(`leave:${activeEvent.id}`)}
+                            onClick={() => handleLeaveEvent(activeEvent)} 
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition border ${
+                              isActionLoading(`leave:${activeEvent.id}`)
+                                ? 'bg-stone-900 border-stone-700 text-stone-500 cursor-wait'
+                                : 'bg-red-950 hover:bg-red-900 text-red-300 border-red-700'
+                            }`}>
+                            {isActionLoading(`leave:${activeEvent.id}`)
+                              ? '退出處理中...'
+                              : '退出本次調查'
+                            }
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                  /* ====可以報名/重新加入==== */
+                  ) : activeEventJoinState?.canJoin ? (
+                    <div className="space-y-4">
+                      {/* 選擇角色 */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <label className="text-sm text-copper font-medium whitespace-nowrap">
+                          指派調查員角色：
+                        </label>
+
+                        {characters.length > 0 ? (
+                          <select value={selectedCharId} onChange={e => setSelectedCharId(e.target.value)} className="w-full bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper">
+                            {characters.map(c => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                                {' '}
+                                ({c.occupation})
+                                {' - '}
+                                SAN: {c.san}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="w-full bg-red-950/30 border border-red-900 rounded-xl px-3 py-2.5 text-xs text-red-300">
+                            你目前尚未建立角色卡，請先至「會員手帳」建立調查員角色。
+                          </div>
+                        )}
+                      </div>
+
+                      {/* withdrawn 特別提示 */}
+                      {activeEventJoinState.key === 'withdrawn' && (
+                        <div className="bg-copper/5 border border-copper/30 rounded-xl p-3 text-xs text-copper leading-relaxed">
+                          ↩ 你曾經退出此場團務，目前名單尚未鎖定，因此可以重新加入。
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button type="button" onClick={() => setActiveEvent(null)} className="px-4 py-2.5 text-sm text-mutedText hover:text-white">
+                          返回
+                        </button>
+
+                        <button type="button" disabled={!selectedCharId || characters.length === 0 || isActionLoading(`join:${activeEvent.id}`)}
                           onClick={() => handleJoinEvent(activeEvent.id)}
                           className={`px-6 py-2.5 rounded-xl text-sm font-bold transition shadow-glow-purple ${
-                            checkIsLocked(activeEvent.event_date,activeEvent.lock_hours) ||
-                            activeEvent.booked_investigators.length >= activeEvent.max_players
+                            !selectedCharId ||
+                            characters.length === 0 ||
+                            isActionLoading(`join:${activeEvent.id}`)
                               ? 'bg-stone-900 text-stone-600 cursor-not-allowed'
                               : 'bg-copper hover:bg-copperDark text-black'
                           }`}
                         >
-                          {checkIsLocked(activeEvent.event_date,activeEvent.lock_hours)
-                            ? `開團前 ${activeEvent.lock_hours || 36} 小時已停止報名`
-                            : activeEvent.booked_investigators.length >= activeEvent.max_players
-                              ? '席位已額滿' : '簽署契約・一鍵報名'}
+                          {isActionLoading(`join:${activeEvent.id}`)
+                            ? '報名處理中...'
+                            : activeEventJoinState.key === 'withdrawn'
+                              ? '↩ 重新加入調查'
+                              : '簽署契約・一鍵報名'
+                          }
                         </button>
                       </div>
                     </div>
+
+                  /* ====不允許報名==== */
+                  ) : (
+                    <div className="space-y-3">
+                      <button type="button" disabled className="w-full py-3 bg-stone-900 border border-stone-700 text-stone-500 rounded-xl text-sm font-bold cursor-not-allowed">
+                        {activeEventJoinState?.label || '目前無法報名'}
+                      </button>
+                      <button type="button" onClick={() =>setActiveEvent(null)} className="w-full py-2 text-xs text-mutedText hover:text-white transition">
+                        返回跑團大廳
+                      </button>
+                    </div>
                   )}
                 </div>
-
               </div>
             </div>
           )}
 
-          {}
           {showAuthModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
               <div className="bg-cardBg border border-purple-500/50 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl relative">
@@ -2376,8 +3598,70 @@
                   <input required type="text" placeholder="場次標題" value={newEventData.title} onChange={e=>setNewEventData({...newEventData, title:e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white" />
                   <input required type="text" placeholder="劇本名稱，例如：無名祭祀書" value={newEventData.scenario_name} onChange={e =>setNewEventData({...newEventData, scenario_name: e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white"/>
                   <input required type="text" placeholder="集合地點" value={newEventData.location} onChange={e=>setNewEventData({...newEventData, location:e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white" />
-                  <input required type="datetime-local" value={newEventData.event_date} onChange={e=>setNewEventData({...newEventData, event_date:e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white" />
-                  <input required type="text" placeholder="一句話導讀" value={newEventData.one_liner} onChange={e=>setNewEventData({...newEventData, one_liner:e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white" />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-mutedText mb-1">
+                        開團日期 *
+                      </label>
+                      <input required type="date"
+                        min={getTodayLocalDate()}
+                        max={`${MAX_EVENT_YEAR}-12-31`}
+                        value={newEventData.event_date}
+                        onChange={e => {
+                          const value = e.target.value;
+                          // 年份最多只能 4 位
+                          if (!hasValidYearLength(value)) {return;}
+                          setNewEventData({...newEventData,event_date: value});
+
+                          // 日期完成後自動跳時間
+                          if (value) {
+                            setTimeout(() => {newEventTimeRef.current ?.focus();}, 0);
+                          }
+                        }}
+                        className="w-full bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-mutedText mb-1">
+                        開團時間 *
+                      </label>
+                      <select ref={editEventTimeRef} required
+                        value={editEventData.event_time}
+                        onChange={e => {
+                          const value = e.target.value;
+                          setEditEventData({...editEventData,event_time: value});
+                          if (value) {setTimeout(() => {editEventIntroRef.current ?.focus();}, 0);
+                          }
+                        }}
+                        className="w-full bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                      >
+                        <option value="">
+                          選擇時間
+                        </option>
+
+                        {editEventData.event_time &&
+                          !TIME_OPTIONS.some(
+                            option => option.value === editEventData.event_time
+                          ) && (
+                          <option value={editEventData.event_time}>
+                            {formatTimeLabel(editEventData.event_time)}
+                            {' '}（原設定）
+                          </option>
+                        )}
+
+                        {TIME_OPTIONS.map( option => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <input ref={newEventIntroRef} required type="text" placeholder="一句話導讀" value={newEventData.one_liner} onChange={e=>setNewEventData({...newEventData, one_liner:e.target.value})} className="w-full bg-void border border-purple-900 rounded-lg p-2 text-sm text-white" />
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-mutedText mb-1">最低成團人數</label>
@@ -2390,9 +3674,123 @@
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
                     <button type="button" onClick={()=>setShowNewEventModal(false)} className="px-4 py-2 text-sm text-mutedText">取消</button>
-                    <button type="submit" className="px-4 py-2 bg-crimson text-white font-bold text-sm rounded-lg">確認發布</button>
+                    <button type="submit"
+                      disabled={isActionLoading('create-event')}
+                      className={`px-4 py-2 font-bold text-sm rounded-lg ${
+                        isActionLoading('create-event')
+                          ? 'bg-stone-800 text-stone-500 cursor-wait'
+                          : 'bg-crimson text-white'
+                      }`}
+                    >
+                      {isActionLoading('create-event')
+                        ? '發布中...'
+                        : '確認發布'
+                      }
+                    </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================
+              Keeper 危險操作確認
+            ========================================== */}
+          {adminConfirmAction && (
+            <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+              <div className="bg-cardBg border border-red-800/60 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs text-red-400 font-bold tracking-wider">
+                      KEEPER CONFIRMATION
+                    </div>
+                    <h3 className="text-xl font-bold text-parchment mt-1">
+                      {adminConfirmAction.type === 'delete' ? '永久刪除團務' : '取消團務'}
+                    </h3>
+                  </div>
+
+                  <button type="button" disabled={adminActionLoading} onClick={handleCloseAdminConfirm} className="w-8 h-8 rounded-full bg-void text-mutedText hover:text-white">
+                    ✕
+                  </button>
+                </div>
+
+                <div className="mt-5 bg-void border border-purple-950 rounded-2xl p-4">
+                  <div className="text-xs text-mutedText">
+                    團務
+                  </div>
+                  <div className="text-base font-bold text-parchment mt-1">
+                    {adminConfirmAction.event.title}
+                  </div>
+                  <div className="text-xs text-copper mt-1">
+                    {adminConfirmAction.event.scenario_name}
+                  </div>
+                </div>
+
+                {adminConfirmAction.type === 'cancel' ? (
+                  <div className="mt-5 bg-amber-950/30 border border-amber-800 rounded-2xl p-4">
+                    <div className="text-sm font-bold text-amber-300">
+                      ⚠ 確定取消這場團務？
+                    </div>
+                    <div className="text-xs text-amber-100/70 mt-2 leading-relaxed">
+                      團務將從跑團大廳移除，但既有報名與歷史資料仍會保留。
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-5 bg-red-950/40 border border-red-800 rounded-2xl p-4">
+                    <div className="text-sm font-bold text-red-300">
+                      ⚠ 確定永久刪除此團務？
+                    </div>
+                    <div className="text-xs text-red-200/70 mt-2 leading-relaxed">
+                      此操作無法復原。
+                      {adminConfirmAction.event.history_count > 0 && (
+                        <>
+                          <br />
+                          此團務包含
+                          {' '}
+                          <strong className="text-red-300">
+                            {adminConfirmAction.event.history_count}
+                          </strong>
+                          {' '}
+                          筆玩家報名歷史，刪除後也會一併移除。
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-purple-950">
+                  <button type="button"
+                    disabled={adminActionLoading}
+                    onClick={handleCloseAdminConfirm}
+                    className="px-4 py-2 text-sm text-mutedText hover:text-white disabled:opacity-50"
+                  >
+                    返回
+                  </button>
+
+                  {adminConfirmAction.type === 'cancel' ? (
+                    <button type="button"
+                      disabled={adminActionLoading}
+                      onClick={() => handleAdminCancelEvent(adminConfirmAction.event)}
+                      className="px-5 py-2.5 bg-amber-800 hover:bg-amber-700 disabled:bg-stone-800 text-white rounded-xl text-sm font-bold transition"
+                    >
+                      {adminActionLoading ? '處理中...' : '確認取消團務'}
+                    </button>
+                  ) : (
+                    <button type="button"
+                      disabled={adminActionLoading}
+                      onClick={() => handleAdminDeleteEvent(adminConfirmAction.event)}
+                      className={`px-5 py-2.5 rounded-xl text-sm font-bold transition 
+                        ${
+                          adminActionLoading
+                            ? 'bg-stone-900 text-stone-600 cursor-wait'
+                            : 'bg-red-800 hover:bg-red-700 text-white'
+                        }
+                      `}
+                    >
+                      {adminActionLoading ? '刪除中...' : '永久刪除'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -2425,15 +3823,68 @@
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-mutedText mb-1">開團日期與時間 *</label>
-                    <input required type="datetime-local" value={editEventData.event_date} onChange={e => setEditEventData({...editEventData,event_date: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
-                    <p className="text-[11px] text-mutedText mt-1">
-                      修改後的新開團時間也必須距離現在超過 {editingEvent.lock_hours || 36} 小時。
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* 編輯：日期 */}
+                      <div>
+                        <label className="block text-xs text-mutedText mb-1">
+                          開團日期 *
+                        </label>
+                        <input required type="date"
+                          min={getTodayLocalDate()}
+                          max={`${MAX_EVENT_YEAR}-12-31`}
+                          value={editEventData.event_date}
+                          onChange={e => {
+                            const value =e.target.value;
+                            if (!hasValidYearLength(value)) {return;}
+                            setEditEventData({...editEventData,event_date: value });
+                            // 日期選完自動跳到時間
+                            if (value) { setTimeout(() => {editEventTimeRef.current ?.focus();}, 0);}
+                          }}
+                          className="w-full bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                        />
+                      </div>
+                      {/* 編輯：時間 */}
+                      <div>
+                        <label className="block text-xs text-mutedText mb-1">
+                          開團時間 *
+                        </label>
+                        <select
+                          ref={editEventTimeRef}
+                          required
+                          value={editEventData.event_time}
+                          onChange={e => {
+                            const value = e.target.value;
+                            setEditEventData({...editEventData,event_time: value});
+                            // 時間選完自動跳到導讀
+                            if (value) {setTimeout(() => {editEventIntroRef.current ?.focus();}, 0);}
+                          }}
+                          className="w-full bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                        >
+                          <option value="">
+                            選擇時間
+                          </option>
+                          {TIME_OPTIONS.map(
+                            option => (
+                              <option
+                                key={option.value}
+                                value={option.value}
+                              >
+                                {option.label}
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-mutedText mt-2">
+                      修改後的新開團時間也必須距離現在超過{' '}
+                      {editingEvent.lock_hours || 36}
+                      {' '}小時。
                     </p>
                   </div>
                   <div>
                     <label className="block text-xs text-mutedText mb-1">一句話導讀 *</label>
-                    <input required type="text" value={editEventData.one_liner} onChange={e => setEditEventData({...editEventData,one_liner: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                    <input ref={editEventIntroRef} required type="text" value={editEventData.one_liner} onChange={e => setEditEventData({...editEventData,one_liner: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -2456,7 +3907,15 @@
                   </div>
                   <div className="flex justify-end gap-3 pt-3 border-t border-purple-950">
                     <button type="button" onClick={() => setEditingEvent(null)} className="px-4 py-2 text-sm text-mutedText hover:text-white transition">取消</button>
-                    <button type="submit" className="px-5 py-2 bg-copper hover:bg-copperDark text-black font-bold text-sm rounded-xl transition">儲存修改</button>
+                    <button type="submit" 
+                      disabled={isActionLoading(`update-event:${editingEvent.id}`)}
+                      className="px-5 py-2 bg-copper hover:bg-copperDark text-black font-bold text-sm rounded-xl transition"
+                    >
+                      {isActionLoading(`update-event:${editingEvent.id}`)
+                        ? '儲存中...'
+                        : '儲存修改'
+                      }  
+                    </button>
                   </div>
                 </form>
               </div>
@@ -2510,11 +3969,7 @@
                         </label>
 
                         <textarea required rows="5"
-                          placeholder={`例如：
-                            SAN -5
-                            偵查 +3
-                            新增狀態：對深海產生恐懼
-                            獲得道具：銀製鑰匙`}
+                          placeholder={`例如：SAN -5、偵查 +3、新增狀態、獲得道具`}
                           value={
                             growthNotes[
                               inv.characterId
@@ -2536,8 +3991,18 @@
                     <button type="button" onClick={() => {setSettlingEvent(null);setGrowthNotes({});}} className="px-4 py-2 text-sm text-mutedText hover:text-white">
                       取消
                     </button>
-                    <button type="submit" className="px-5 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition">
-                      ✓ 完成團務結算
+                    <button type="submit"
+                      disabled={isActionLoading(`settle:${settlingEvent.id}`)}
+                      className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${
+                        isActionLoading(`settle:${settlingEvent.id}`)
+                          ? 'bg-stone-800 text-stone-500 cursor-wait'
+                          : 'bg-emerald-800 hover:bg-emerald-700 text-white'
+                      }`}
+                    >
+                      {isActionLoading(`settle:${settlingEvent.id}`)
+                        ? '結算處理中...'
+                        : '✓ 完成團務結算'
+                      }
                     </button>
                   </div>
                 </form>
@@ -2643,10 +4108,7 @@
 
                               <div className="flex items-center">
                                 <button type="button"
-                                  disabled={
-                                    !result.character_id ||
-                                    alreadyJoined
-                                  }
+                                  disabled={!result.character_id || alreadyJoined || isActionLoading(`add:${result.character_id}`)}
                                   onClick={() => handleAdminAddParticipant(result.character_id)}
                                   className={`px-4 py-2 rounded-xl text-xs font-bold ${
                                     !result.character_id ||
@@ -2655,11 +4117,13 @@
                                       : 'bg-emerald-900 hover:bg-emerald-800 text-emerald-100'
                                   }`}
                                 >
-                                  {alreadyJoined
-                                    ? '已在隊伍中'
-                                    : !result.character_id
-                                      ? '無角色'
-                                      : '加入團務'
+                                  {isActionLoading(`add:${result.character_id}`)
+                                    ? '加入中...'
+                                    : alreadyJoined
+                                      ? '已在隊伍中'
+                                      : !result.character_id
+                                        ? '無角色'
+                                        : '加入團務'
                                   }
                                 </button>
                               </div>
@@ -2708,32 +4172,35 @@
                       這名調查員目前尚無成長紀錄。
                     </div>
                   ) : ( growthRecords.filter( record => record.character_id === growthRecordCharacter.id)
-                      .map(record => (
-                        <div key={record.id} className="bg-void rounded-2xl border border-purple-950 p-5 space-y-3">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div>
-                              <div className="text-sm font-bold text-parchment">
-                                {record.events?.title || '未知團務'}
+                      .map(record => {
+                        const recordEvent = events.find(evt => evt.id === record.event_id);
+                        return (
+                          <div key={record.id} className="bg-void rounded-2xl border border-purple-950 p-5 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <div className="text-sm font-bold text-parchment">
+                                  {recordEvent?.title || '未知團務'}
+                                </div>
+                                <div className="text-xs text-copper mt-0.5">
+                                  {recordEvent?.scenario_name}
+                                </div>
                               </div>
-                              <div className="text-xs text-copper mt-0.5">
-                                {record.events?.scenario_name}
+                              <div className="text-xs text-mutedText">
+                                {new Date( record.created_at).toLocaleDateString('zh-TW')}
                               </div>
                             </div>
-                            <div className="text-xs text-mutedText">
-                              {new Date( record.created_at).toLocaleDateString('zh-TW')}
-                            </div>
-                          </div>
 
-                          <div className="border-t border-purple-950 pt-3">
-                            <div className="text-xs text-mutedText mb-2">
-                              Keeper 成長紀錄
-                            </div>
-                            <div className="text-sm text-parchment leading-relaxed whitespace-pre-wrap bg-cardBg p-4 rounded-xl border border-purple-900/50">
-                              {record.growth_note}
+                            <div className="border-t border-purple-950 pt-3">
+                              <div className="text-xs text-mutedText mb-2">
+                                Keeper 成長紀錄
+                              </div>
+                              <div className="text-sm text-parchment leading-relaxed whitespace-pre-wrap bg-cardBg p-4 rounded-xl border border-purple-900/50">
+                                {record.growth_note}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))
+                        )
+                      })
                   )}
                 </div>
 
@@ -2812,8 +4279,18 @@
                     <button type="button" onClick={() => setShowProfileEdit(false)} className="px-4 py-2 text-sm text-mutedText hover:text-white">
                       取消
                     </button>
-                    <button type="submit" className="px-5 py-2 bg-copper hover:bg-copperDark text-black rounded-xl text-sm font-bold">
-                      儲存會員資料
+                    <button type="submit"
+                      disabled={isActionLoading('profile')}
+                      className={`px-5 py-2 rounded-xl text-sm font-bold ${
+                        isActionLoading('profile')
+                          ? 'bg-stone-800 text-stone-500 cursor-wait'
+                          : 'bg-copper hover:bg-copperDark text-black'
+                      }`}
+                    >
+                      {isActionLoading('profile')
+                        ? '儲存中...'
+                        : '儲存會員資料'
+                      }
                     </button>
                   </div>
                 </form>
@@ -2869,21 +4346,150 @@
                   </div>
                   <div className="flex justify-end gap-3 pt-3 border-t border-purple-950">
                     <button type="button" onClick={() => setEditingCharacter(null)} className="px-4 py-2 text-sm text-mutedText hover:text-white">取消</button>
-                    <button type="submit" className="px-5 py-2 bg-copper hover:bg-copperDark text-black rounded-xl text-sm font-bold">儲存角色卡</button>
+                    <button type="submit"
+                      disabled={isActionLoading(`update-char:${editingCharacter.id}`)}
+                      className={`px-5 py-2 rounded-xl text-sm font-bold ${
+                        isActionLoading(`update-char:${editingCharacter.id}`)
+                          ? 'bg-stone-800 text-stone-500 cursor-wait'
+                          : 'bg-copper hover:bg-copperDark text-black'
+                      }`}
+                    >
+                      {isActionLoading(`update-char:${editingCharacter.id}`)
+                        ? '儲存中...'
+                        : '儲存角色卡'
+                      }
+                    </button>
                   </div>
                 </form>
               </div>
             </div>
           )}
 
-          {}
+          {/* ==========================================
+              彈窗：上傳圖片 (Keeper 專用)
+            ========================================== */}
+          {showGalleryForm && (
+            <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl">
+                <div className="flex justify-between items-start mb-5">
+                  <div>
+                    <div className="text-xs text-copper">
+                      GALLERY ARCHIVE
+                    </div>
+                    <h3 className="text-xl font-bold text-parchment">
+                      {editingGalleryItem
+                        ? '編輯花絮'
+                        : '新增花絮'}
+                    </h3>
+                  </div>
+                  <button type="button" disabled={gallerySaving} onClick={handleCloseGalleryForm} className="w-8 h-8 bg-void rounded-full text-mutedText hover:text-white">
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveGallery} className="space-y-5">
+                  {editingGalleryItem && (
+                    <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-void border border-purple-950">
+                      <img src={editingGalleryItem.imageUrl} alt="" className="w-full h-full object-cover"/>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs text-mutedText mb-2">
+                      {editingGalleryItem
+                        ? '替換圖片（選填）'
+                        : '花絮圖片 *'}
+                    </label>
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={gallerySaving}
+                      onChange={e => setGalleryFile(e.target.files?.[0] || null)}
+                      className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-sm text-mutedText"/>
+                    <p className="text-[11px] text-mutedText mt-1">
+                      JPG、PNG、WebP、AVIF，最大 5MB。網站縮圖統一顯示為 4:3。
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-mutedText mb-2">
+                      圖片摘要 *
+                    </label>
+                    <textarea required maxLength="500" rows="4" disabled={gallerySaving} value={galleryCaption}
+                      onChange={e => setGalleryCaption(e.target.value)}
+                      placeholder="簡短記錄這張照片的內容..."
+                      className="w-full bg-void border border-purple-900 rounded-xl p-3 text-sm text-parchment resize-y"/>
+                    <div className="text-right text-[11px] text-mutedText mt-1">
+                      {galleryCaption.length}
+                      {' / '}
+                      500
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-4 border-t border-purple-950">
+                    <button type="button" disabled={gallerySaving} onClick={handleCloseGalleryForm} className="px-4 py-2 text-sm text-mutedText hover:text-white">
+                      取消
+                    </button>
+                    <button type="submit"
+                      disabled={gallerySaving}
+                      className="px-5 py-2.5 bg-copper hover:bg-copperDark disabled:bg-stone-800 disabled:text-stone-500 text-black rounded-xl text-sm font-bold">
+                      {gallerySaving
+                        ? '儲存中...'
+                        : editingGalleryItem
+                          ? '儲存修改'
+                          : '發布花絮'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================
+              彈窗：Lightbox
+            ========================================== */}
+          {galleryLightboxIndex !== null && galleryItems[galleryLightboxIndex] && (
+            <div onClick={closeGalleryLightbox} className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
+              <button onClick={closeGalleryLightbox} className="absolute top-5 right-5 z-20 w-10 h-10 rounded-full bg-black/60 border border-white/20 text-white hover:bg-black">
+                ✕
+              </button>
+
+              {
+                galleryItems.length > 1 && (
+                <button onClick={e => {e.stopPropagation(); showPreviousGallery();}} className="absolute left-3 sm:left-8 z-20 w-11 h-11 rounded-full bg-black/60 border border-white/20 text-white text-xl hover:bg-black">
+                  ←
+                </button>
+              )}
+
+              <div onClick={e => e.stopPropagation()} className="max-w-5xl w-full max-h-[90vh] flex flex-col items-center justify-center">
+                <img
+                  src={galleryItems[galleryLightboxIndex].imageUrl}
+                  alt={galleryItems[galleryLightboxIndex].caption}
+                  className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl"/>
+                <div className="mt-4 max-w-2xl text-center">
+                  <p className="text-sm sm:text-base text-parchment leading-relaxed">
+                    {galleryItems[galleryLightboxIndex].caption}
+                  </p>
+
+                  <div className="text-xs text-mutedText mt-2">
+                    {galleryLightboxIndex + 1}
+                    {' / '}
+                    {galleryItems.length}
+                  </div>
+
+                </div>
+              </div>
+
+              {galleryItems.length > 1 && (
+                <button onClick={e => {e.stopPropagation(); showNextGallery();}} className="absolute right-3 sm:right-8 z-20 w-11 h-11 rounded-full bg-black/60 border border-white/20 text-white text-xl hover:bg-black">
+                  →
+                </button>
+              )}
+            </div>
+          )}
+
           <footer className="border-t border-purple-900/30 bg-void/90 py-6 text-center text-xs text-mutedText">
             <div className="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-3">
               <span className="font-gothic tracking-wider text-parchment">
                 MISKATONIC ARCHIVES • CALL OF CTHULHU 7TH ED.
               </span>
               <span>
-                每週一團 • 沉浸式 TRPG 預約管理系統
+                沉浸式 TRPG 預約管理系統
               </span>
             </div>
           </footer>
