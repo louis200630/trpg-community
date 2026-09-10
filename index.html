@@ -193,6 +193,7 @@
       const [adminEventTab, setAdminEventTab] = useState('upcoming');
       const [memberEventTab, setMemberEventTab] = useState('current');
       const [memberHistoryLimit, setMemberHistoryLimit] = useState(10);
+      const [showArchivedCharacters, setShowArchivedCharacters] = useState(false);
       // Keeper 報名者詳細資料展開
       const [expandedParticipantKey, setExpandedParticipantKey] = useState(null);
 
@@ -649,14 +650,14 @@
 
           setCharacters(chars);
 
-          if (chars.length > 0) {
-            const activeChar = chars.find(char => char.is_active === true) || chars[0];
+          const playableChars = chars.filter( char => !char.is_archived);
+          if ( playableChars.length > 0) {
+            const activeChar = playableChars.find(char => char.is_active === true) || playableChars[0];
             setSelectedCharId(activeChar.id);
           } else {
             setSelectedCharId('');
           }
           return true;
-
         } catch (err) {
           console.error('❌ 角色資料讀取失敗:',err);
           return false;
@@ -698,14 +699,129 @@
         }
       };
 
+      // 封存角色
+      const handleArchiveCharacter = async (character) => {
+        if (!currentUser) { return showToast( '請先登入。', 'error');}
+
+        const actionKey = `archive-char:${character.id}`;
+
+        if (isActionLoading(actionKey)) {return;}
+        setActionLoading(actionKey);
+
+        try {
+          const {data, error} =
+            await supabaseClient.rpc(
+              'archive_character',
+              {p_character_id: character.id}
+            );
+          console.log('🗃 封存角色:',data,error);
+
+          if (error) {return showToast('封存失敗：' + error.message,'error');}
+          await fetchCharacters();
+          showToast(`「${character.name}」已移入封存檔案。`,'success');
+
+        } catch (err) {
+          console.error('封存角色錯誤:',err);
+          showToast('封存失敗：' + err.message,'error');
+        } finally {
+          setActionLoading(null);
+        }
+      };
+
+
+      // ==========================================
+      // 解除封存
+      // ==========================================
+
+      const handleRestoreCharacter =
+        async (character) => {
+
+        const actionKey =
+          `restore-char:${character.id}`;
+
+
+        if (
+          isActionLoading(
+            actionKey
+          )
+        ) {
+          return;
+        }
+
+
+        setActionLoading(
+          actionKey
+        );
+
+
+        try {
+
+          const {
+            data,
+            error
+          } =
+            await supabaseClient.rpc(
+              'restore_character',
+              {
+                p_character_id:
+                  character.id
+              }
+            );
+
+
+          console.log(
+            '📂 解除封存角色:',
+            data,
+            error
+          );
+
+
+          if (error) {
+
+            return showToast(
+              '解除封存失敗：' +
+              error.message,
+              'error'
+            );
+
+          }
+
+
+          await fetchCharacters();
+
+
+          showToast(
+            `「${character.name}」已恢復使用。`,
+            'success'
+          );
+
+
+        } catch (err) {
+
+          console.error(
+            '解除封存角色錯誤:',
+            err
+          );
+
+          showToast(
+            '解除封存失敗：' +
+            err.message,
+            'error'
+          );
+
+
+        } finally {
+
+          setActionLoading(null);
+
+        }
+
+      };
+
+
       const getMyBookingRecord = (evt) => {
         if (!currentUser || !evt?.my_booking) { return null;}
         return evt.my_booking;
-      };
-
-      const isBooked = (evt) => {
-        const booking = getMyBookingRecord(evt);
-        return ( booking?.status === 'confirmed');
       };
 
       const getEventJoinState = (evt) => {
@@ -1181,13 +1297,10 @@
           if (error) { throw error;}
 
           // 第一張角色自動出戰
-          if ( characters.length === 0 && createdChar?.id) {
+          const playableCharacterCount = characters.filter(character => !character.is_archived).length;
+          if ( playableCharacterCount === 0 && createdChar?.id) {
             const { error: activeError} =
-              await supabaseClient.rpc(
-                'set_active_character',
-                {p_character_id: createdChar.id}
-              );
-
+              await supabaseClient.rpc('set_active_character',{p_character_id: createdChar.id});
             if (activeError) {
               console.error('設定初始出戰角色失敗:',activeError);
             }
@@ -1804,6 +1917,11 @@
             setActionLoading(null);
           }
       };
+
+      // 可使用角色
+      const availableCharacters = characters.filter( character => !character.is_archived);
+      // 已封存角色
+      const archivedCharacters = characters.filter( character => character.is_archived);
 
       // 取得使用者的報名紀錄
       const myEventRecords = currentUser ? events.filter( evt => getMyBookingRecord(evt)) : [];
@@ -2508,7 +2626,7 @@
                       <div className="flex items-center justify-between border-b border-purple-900/40 pb-3">
                         <div>
                           <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
-                            <span>📋</span> 我的調查員角色卡 ({characters.length} 張)
+                            <span>📋</span> 我的調查員角色卡 ({availableCharacters.length} 張)
                           </h3>
                           <p className="text-xs text-mutedText mt-1">報名時將預設攜帶「出戰中」的角色，亦可在報名視窗自由選擇。</p>
                         </div>
@@ -2593,7 +2711,7 @@
 
                       {/* 角色卡列表 */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {characters.map(c => {
+                        {availableCharacters.map(c => {
 
                           const charGrowthRecords =
                             growthRecords.filter( record => record.character_id === c.id);
@@ -2663,11 +2781,113 @@
                                   ✏️ 編輯角色
                                 </button>
 
+                                <button type="button"
+                                  disabled={isActionLoading(`archive-char:${c.id}`)}
+                                  onClick={() => handleArchiveCharacter(c)}
+                                  className={`px-3 py-1.5 border rounded-xl text-xs font-bold transition ${
+                                    isActionLoading(`archive-char:${c.id}`)
+                                      ? 'bg-stone-900 border-stone-800 text-stone-600 cursor-wait'
+                                      : 'bg-stone-950 hover:bg-stone-900 border-stone-800 text-stone-400 hover:text-parchment'
+                                  }`}
+                                >
+                                  {isActionLoading(`archive-char:${c.id}`)
+                                    ? '封存中...'
+                                    : '🗃 封存'
+                                  }
+                                </button>
+
                               </div>
                             </div>
                           );
                         })}
                       </div>
+
+                      {archivedCharacters.length > 0 && (
+                        <div className="mt-5 border border-purple-950 rounded-2xl overflow-hidden bg-void/30">
+                          <button
+                            type="button"
+                            onClick={() => setShowArchivedCharacters(current => !current)}
+                            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-cardHover transition"
+                          >
+                            <div>
+                              <div className="text-sm font-bold text-mutedText">
+                                🗃 已封存調查員
+                              </div>
+                              <div className="text-[11px] text-stone-600 mt-0.5">
+                                保留過往團務與成長紀錄
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-mutedText">
+                                {archivedCharacters.length} 張
+                              </span>
+                              <span className="text-xs text-copper">
+                                {showArchivedCharacters
+                                  ? '▲'
+                                  : '▼'
+                                }
+                              </span>
+                            </div>
+                          </button>
+
+                          {showArchivedCharacters && (
+                            <div className="p-4 border-t border-purple-950 grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {archivedCharacters.map(
+                                character => {
+                                  const charGrowthRecords = growthRecords.filter(record => record.character_id === character.id);
+
+                                  return (
+
+                                    <div key={character.id} className="bg-stone-950/60 border border-stone-800 rounded-2xl p-4 opacity-80">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                          <div className="font-bold text-parchment">
+                                            {character.name}
+                                          </div>
+                                          <div className="text-xs text-mutedText mt-0.5">
+                                            {character.occupation}
+                                          </div>
+                                        </div>
+                                        <span className="text-[10px] px-2 py-1 rounded-lg bg-stone-900 border border-stone-700 text-stone-400">
+                                          已封存
+                                        </span>
+                                      </div>
+                                      <div className="mt-3 text-xs text-mutedText">
+                                        SAN{' '}
+                                        <span className="text-parchment">
+                                          {character.san}
+                                          {' / '}
+                                          {character.max_san}
+                                        </span>
+                                      </div>
+                                      <div className="mt-4 pt-3 border-t border-stone-800 flex justify-end gap-2">
+                                        <button type="button" onClick={() => setGrowthRecordCharacter(character)} className="px-3 py-1.5 bg-purple-950/50 border border-purple-900 text-purple-300 rounded-xl text-xs font-bold">
+                                          📜 成長紀錄
+                                          {charGrowthRecords.length > 0 && ` (${charGrowthRecords.length})`}
+                                        </button>
+                                        <button type="button" disabled={ isActionLoading(`restore-char:${character.id}`)}
+                                          onClick={() => handleRestoreCharacter(character)}
+                                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                                            isActionLoading(`restore-char:${character.id}`)
+                                              ? 'bg-stone-900 border-stone-800 text-stone-600 cursor-wait'
+                                              : 'bg-copper/10 hover:bg-copper/20 border-copper/40 text-copper'
+                                          }`}
+                                        >
+                                          {isActionLoading(`restore-char:${character.id}`)
+                                            ? '恢復中...'
+                                            : '↩ 解除封存'
+                                          }
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* 我的預約與出團記錄 */}
@@ -3308,9 +3528,9 @@
                           指派調查員角色：
                         </label>
 
-                        {characters.length > 0 ? (
+                        {availableCharacters.length > 0 ? (
                           <select value={selectedCharId} onChange={e => setSelectedCharId(e.target.value)} className="w-full bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper">
-                            {characters.map(c => (
+                            {availableCharacters.map(c => (
                               <option key={c.id} value={c.id}>
                                 {c.name}
                                 {' '}
@@ -3339,11 +3559,11 @@
                           返回
                         </button>
 
-                        <button type="button" disabled={!selectedCharId || characters.length === 0 || isActionLoading(`join:${activeEvent.id}`)}
+                        <button type="button" disabled={!selectedCharId || availableCharacters.length === 0 || isActionLoading(`join:${activeEvent.id}`)}
                           onClick={() => handleJoinEvent(activeEvent.id)}
                           className={`px-6 py-2.5 rounded-xl text-sm font-bold transition shadow-glow-purple ${
                             !selectedCharId ||
-                            characters.length === 0 ||
+                            availableCharacters.length === 0 ||
                             isActionLoading(`join:${activeEvent.id}`)
                               ? 'bg-stone-900 text-stone-600 cursor-not-allowed'
                               : 'bg-copper hover:bg-copperDark text-black'
@@ -3627,36 +3847,42 @@
                       <label className="block text-xs text-mutedText mb-1">
                         開團時間 *
                       </label>
-                      <select ref={editEventTimeRef} required
-                        value={editEventData.event_time}
+                      <select ref={newEventTimeRef} required
+                        value={newEventData.event_time}
                         onChange={e => {
                           const value = e.target.value;
-                          setEditEventData({...editEventData,event_time: value});
-                          if (value) {setTimeout(() => {editEventIntroRef.current ?.focus();}, 0);
+                          setNewEventData({...newEventData,event_time: value});
+
+                          // 時間選完，自動跳到一句話導讀
+                          if (value) {
+                            setTimeout(() => {
+                              newEventIntroRef.current ?.focus();
+                            }, 0);
+
                           }
+
                         }}
+
                         className="w-full bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
                       >
+
                         <option value="">
                           選擇時間
                         </option>
 
-                        {editEventData.event_time &&
-                          !TIME_OPTIONS.some(
-                            option => option.value === editEventData.event_time
-                          ) && (
-                          <option value={editEventData.event_time}>
-                            {formatTimeLabel(editEventData.event_time)}
-                            {' '}（原設定）
-                          </option>
-                        )}
+                        {TIME_OPTIONS.map(
+                          option => (
 
-                        {TIME_OPTIONS.map( option => (
-                            <option key={option.value} value={option.value}>
+                            <option
+                              key={option.value}
+                              value={option.value}
+                            >
                               {option.label}
                             </option>
+
                           )
                         )}
+
                       </select>
                     </div>
                   </div>
@@ -3855,25 +4081,40 @@
                           onChange={e => {
                             const value = e.target.value;
                             setEditEventData({...editEventData,event_time: value});
-                            // 時間選完自動跳到導讀
-                            if (value) {setTimeout(() => {editEventIntroRef.current ?.focus();}, 0);}
+                            if (value) {
+                              setTimeout(() => {
+                                editEventIntroRef.current
+                                  ?.focus();
+                              }, 0);
+                            }
                           }}
                           className="w-full bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
                         >
                           <option value="">
                             選擇時間
                           </option>
+                          
+                          {editEventData.event_time &&
+                            !TIME_OPTIONS.some(
+                              option =>
+                                option.value ===
+                                editEventData.event_time
+                            ) && (
+
+                            <option value={editEventData.event_time}>
+                              {formatTimeLabel(editEventData.event_time)}
+                              {' '}（原設定）
+                            </option>
+                          )}
                           {TIME_OPTIONS.map(
                             option => (
-                              <option
-                                key={option.value}
-                                value={option.value}
-                              >
+                              <option key={option.value} value={option.value}>
                                 {option.label}
                               </option>
                             )
                           )}
                         </select>
+
                       </div>
                     </div>
                     <p className="text-[11px] text-mutedText mt-2">
