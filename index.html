@@ -128,7 +128,6 @@
         tag: '經典逃脫',
         summary: '軍醫精準投擲燃燒瓶封鎖旋轉階梯，調查員全員成功搭乘救生艇衝破潮汐逃脫。',
         survivors: ['湯瑪斯 (軍醫)', '奧古斯特 (教授)'],
-        exp: 120,
         image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80'
       },
       {
@@ -138,7 +137,6 @@
         tag: '狂亂震撼',
         summary: '四人誤闖古林石陣，在黎明破曉前夕驅車衝出封鎖，但一人意識陷入永久創傷。',
         survivors: ['艾琳 (偵探)', '諾曼 (記者)'],
-        exp: 100,
         image: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80'
       }
     ];
@@ -180,6 +178,40 @@
       const [isUsingMock, setIsUsingMock] = useState(false);
       const [settlingEvent, setSettlingEvent] = useState(null);
       const [growthNotes, setGrowthNotes] = useState({});
+      const [growthRecords, setGrowthRecords] = useState([]);
+      const [growthRecordCharacter, setGrowthRecordCharacter] = useState(null);
+      const [showProfileEdit, setShowProfileEdit] = useState(false);
+      const [adminProfiles, setAdminProfiles] = useState({});
+      const [profileForm, setProfileForm] =
+        useState({
+          display_name: '',
+          phone: '',
+          line_id: ''
+        });
+      const [editingCharacter, setEditingCharacter] = useState(null);
+      const [editCharacterData, setEditCharacterData] = useState({
+          name: '',
+          occupation: '',
+          san: 60,
+          max_san: 99,
+          feature: ''
+        });
+      const [
+        addingParticipantEvent,
+        setAddingParticipantEvent
+      ] = useState(null);
+      const [
+        memberSearch,
+        setMemberSearch
+      ] = useState('');
+      const [
+        memberSearchResults,
+        setMemberSearchResults
+      ] = useState([]);
+      const [
+        searchingMembers,
+        setSearchingMembers
+      ] = useState(false);
 
       // 互動視窗狀態
       const [activeEvent, setActiveEvent] = useState(null);
@@ -189,9 +221,15 @@
       // 表單狀態
       const [showAuthModal, setShowAuthModal] = useState(false);
       const [authMode, setAuthMode] = useState('login'); // login | signup
+      const [authPasswordConfirm, setAuthPasswordConfirm] = useState('');
+      const [awaitingEmailVerification, setAwaitingEmailVerification] = useState(false);
       const [authEmail, setAuthEmail] = useState('');
       const [authPassword, setAuthPassword] = useState('');
       const [authName, setAuthName] = useState('');
+
+      const [authError, setAuthError] = useState('');
+      const [authInfo, setAuthInfo] = useState('');
+      const [authLoading, setAuthLoading] = useState(false);
       
       const [showNewEventModal, setShowNewEventModal] = useState(false);
       const [newEventData, setNewEventData] = useState({ title: '', scenario_name: '', location: '', event_date: '', one_liner: '', min: 1, max: 4});
@@ -239,9 +277,23 @@
           data: authListener
         } = supabaseClient.auth.onAuthStateChange(
           (event, session) => {
-            console.log('🔐 Auth 狀態改變:', event, session);
+            console.log('🔐 Auth 狀態改變:',event,session);
 
             setCurrentUser(session?.user ?? null);
+
+            // 使用者從重設密碼 Email 回來
+            if (event === 'PASSWORD_RECOVERY') {
+
+              setAuthMode('recovery');
+
+              setAuthPassword('');
+              setAuthPasswordConfirm('');
+
+              setAuthError('');
+              setAuthInfo('身分驗證成功，請設定新的登入密碼。');
+
+              setShowAuthModal(true);
+            }
           }
         );
 
@@ -250,6 +302,20 @@
         };
 
       }, []);
+
+      // 建立重設密碼 Redirect URL
+      const getAuthRedirectUrl = () => {
+        if (
+          window.location.protocol !== 'http:' &&
+          window.location.protocol !== 'https:'
+        ) {
+          return null;
+        }
+        return (
+          window.location.origin +
+          window.location.pathname
+        );
+      };
 
       const fetchProfile = async (user) => {
         if (!supabaseClient || !user) {
@@ -297,19 +363,98 @@
         }
       };
 
+      // Keeper 聯絡資料
+      const fetchAdminProfiles = async () => {
+        if ( !currentUser || accountRole !== 'admin') {
+          setAdminProfiles({});
+          return;
+        }
+        const { data, error } =
+          await supabaseClient
+            .from('profiles')
+            .select(`
+              id,
+              email,
+              display_name,
+              phone,
+              line_id
+            `);
+        console.log('📇 Keeper 會員聯絡資料:',data,error);
+        if (error) {
+          console.error('讀取會員聯絡資料失敗:',error);
+          return;
+        }
+        const profileMap =
+          Object.fromEntries(
+            (data || []).map(
+              p => [p.id, p]
+            )
+          );
+        setAdminProfiles(profileMap);
+      };
+
+      // 會員資料編輯
+      const handleOpenProfileEdit = () => {
+        setProfileForm({
+          display_name: profile?.display_name || '',
+          phone: profile?.phone || '',
+          line_id: profile?.line_id || ''
+        });
+        setShowProfileEdit(true);
+      };
+
+      const handleUpdateProfile = async (e) => {
+        e.preventDefault();
+
+        if (!currentUser) { return showToast('請先登入。','error');}
+        if (!profileForm.display_name.trim()) { return showToast('請輸入調查員暱稱。','error');}
+
+        try {
+          const { data, error } =
+            await supabaseClient.rpc(
+              'update_my_profile',
+              {
+                p_display_name: profileForm.display_name.trim(),
+                p_phone: profileForm.phone.trim() || null,
+                p_line_id: profileForm.line_id.trim() || null
+              }
+            );
+
+          console.log('👤 更新會員資料:',data,error);
+
+          if (error) {
+            return showToast('更新失敗：' + error.message,'error');
+          }
+
+          await fetchProfile(currentUser);
+          setShowProfileEdit(false);
+          showToast('會員資料已更新。','success');
+
+        } catch (err) {
+          console.error('會員資料更新錯誤:',err);
+          showToast('更新失敗：' + err.message, 'error');
+        }
+      };
+
+      // Admin 身分確認後才抓
       useEffect(() => {
+        if ( currentUser && accountRole === 'admin') {
+          fetchAdminProfiles();
+        } else {
+          setAdminProfiles({});
+        }
+      }, [
+        currentUser, accountRole
+      ]);
 
+      useEffect(() => {
         if (currentUser) {
-
           console.log('👤 已登入，讀取會員資料:', currentUser.id);
-
           fetchProfile(currentUser);
           fetchAllData();
-
+          fetchGrowthRecords();
         } else {
-
           console.log('👤 未登入');
-
           setProfile(null);
           setAccountRole('member');
           setPortalView('member');
@@ -317,6 +462,7 @@
           // 登出後一定要清空上一個人的角色卡
           setCharacters([]);
           setSelectedCharId('');
+          setGrowthRecords([]);
 
           // 公開場次仍然可以讀
           fetchAllData();
@@ -365,7 +511,11 @@
             const { data: chars } = await supabaseClient.from('characters').select('*').eq('user_id', currentUser.id);
             if (chars && chars.length > 0) {
               setCharacters(chars);
-              setSelectedCharId(chars[0].id);
+              const activeChar = chars.find(char => char.is_active === true) || chars[0];
+              setSelectedCharId(activeChar.id);
+            } else {
+              setCharacters([]);
+              setSelectedCharId('');
             }
           }
           setIsUsingMock(false);
@@ -380,6 +530,35 @@
         setCharacters(MOCK_CHARS);
         setSelectedCharId(MOCK_CHARS[0].id);
         setIsUsingMock(true);
+      };
+
+      // 稱號設定
+      const getCharacterTitle = (san) => {
+        const value = Number(san) || 0;
+        if (value >= 80) {return '【清醒】理智守望者';}
+        if (value >= 60) {return '【堅定】秘聞調查員';}
+        if (value >= 40) {return '【動搖】深淵凝視者';}
+        if (value >= 20) {return '【危險】夢魘倖存者';}
+        return '【狂亂】不可名狀之觸';
+      };
+
+      // 出戰角色
+      const handleSetActiveCharacter =
+        async (characterId) => {
+        if (!currentUser) { return showToast('請先登入。','error');}
+        try {
+          const { data, error } =
+            await supabaseClient.rpc('set_active_character',{p_character_id: characterId});
+          console.log('⚔️ 設定出戰角色:',data,error);
+          if (error) {
+            return showToast('設定失敗：' + error.message,'error');
+          }
+          await fetchAllData();
+          showToast('出戰調查員已更新。','success');
+        } catch (err) {
+          console.error('設定出戰角色錯誤:',err);
+          showToast('設定失敗：' + err.message,'error');
+        }
       };
 
       // 輔助判斷
@@ -400,75 +579,226 @@
         );
       };
 
+      const clearAuthFeedback = () => { setAuthError(''); setAuthInfo('');};
+      const handleCloseAuthModal = () => {
+        setShowAuthModal(false);
+        setAuthError('');
+        setAuthInfo('');
+        setAuthPassword('');
+      };
+      const handleSwitchAuthMode = (mode) => {
+        setAuthMode(mode);
+
+        setAuthError('');
+        setAuthInfo('');
+        setAuthPassword('');
+        setAuthPasswordConfirm('');
+        setAwaitingEmailVerification(false);
+
+        if (mode === 'login') {
+          setAuthName('');
+        }
+      };
+
+      const getAuthErrorMessage = (error, mode) => {
+        const message =
+          String(error?.message || '' ).toLowerCase();
+
+        if (message.includes('invalid login credentials')) {return 'Email 或密碼不正確，請重新確認。';}
+        if (message.includes('email not confirmed')) {return '此 Email 尚未完成信箱驗證，請先至信箱完成驗證。';}
+        if (message.includes('already registered') || message.includes('user already registered')) {return '這個 Email 可能已經註冊過，請直接切換至登入。';}
+        if (message.includes('password') && message.includes('at least')) {return '密碼長度不足，請設定至少 6 位密碼。';}
+        if (message.includes('invalid email') || message.includes('invalid format')) {return 'Email 格式不正確，請重新輸入。';}
+        if (message.includes('rate limit') || message.includes('too many requests') || error?.status === 429) {return '操作次數過多，請稍後再試。';}
+
+        return mode === 'signup'
+          ? `註冊失敗：${error?.message || '請稍後再試。'}`
+          : `登入失敗：${error?.message || '請稍後再試。'}`;
+      };
+
       /* 1. 登入與註冊 */
       const handleAuthSubmit = async (e) => {
         e.preventDefault();
-        console.log('=== 表單 submit 有觸發 ===');
-        console.log('authMode:', authMode);
-        console.log('email:', authEmail);
-        console.log('name:', authName);
 
-        if (!supabaseClient) {
-          console.error('Supabase Client 不存在');
-          return showToast('Supabase 尚未初始化', 'error');
-        }
-        try {
-          if (authMode === 'signup') {
-            console.log('準備呼叫 signUp');
-            const { data, error } =
-              await supabaseClient.auth.signUp({
-                email: authEmail.trim(),
-                password: authPassword,
-                options: {
-                  data: {
-                    full_name: authName.trim()
-                  }
-                }
-              });
-            console.log('SIGNUP DATA:', data);
-            console.log('SIGNUP ERROR:', error);
+        if (authLoading) {return;}
+        clearAuthFeedback();
+        const email = authEmail.trim();
+        const password = authPassword;
+        const name = authName.trim();
 
-            if (error) {
-              console.error('註冊失敗:', error);
-              showToast( '註冊失敗：' + error.message, 'error');
-              return;
-            }
+        // 前端驗證
+        if (!supabaseClient) { setAuthError('系統目前無法連接會員服務，請稍後再試。'); return;}
+        if (!email) { setAuthError('請輸入 Email。'); return;}
 
-            showToast(data.session ? '註冊成功，已登入！' : '註冊成功！請查看信箱完成驗證。', 'success');
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-            setAuthEmail('');
-            setAuthPassword('');
-            setAuthName('');
-            setShowAuthModal(false);
-
-          } else {
-            const { data, error } =
-              await supabaseClient.auth.signInWithPassword({
-                email: authEmail.trim(),
-                password: authPassword
-              });
-            console.log('LOGIN DATA:', data);
-            console.log('LOGIN ERROR:', error);
-
-            if (error) {
-              showToast( '登入失敗：' + error.message,'error');
-              return;
-            }
-
-            showToast('歡迎歸來，調查員。','success');
-            setAuthEmail('');
-            setAuthPassword('');
-            setShowAuthModal(false);
+        if (!emailRegex.test(email)) { setAuthError('Email 格式不正確，請重新確認。'); return;}        
+        // 忘記密碼
+        if (authMode === 'forgot') {
+          const redirectTo = getAuthRedirectUrl();
+          if (!redirectTo) {setAuthError('密碼重設功能需要透過 localhost 或正式網站網址測試，無法使用 file:// 網址。'); return;}
+          setAuthLoading(true);
+          try {
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo});
+            console.log('🔑 resetPasswordForEmail:',error);
+            if (error) {setAuthError('無法寄送重設密碼信：' + error.message); return;}
+            setAuthInfo('如果此 Email 已註冊，我們已寄出密碼重設信。請前往信箱查看。');
+          } catch (err) {
+            console.error('寄送重設密碼信錯誤:',err);
+            setAuthError('目前無法寄送重設密碼信，請稍後再試。');
+          } finally {
+            setAuthLoading(false);
           }
-        } catch (err) {
-          console.error('Auth 未預期錯誤:', err);
-          showToast('系統錯誤：' + err.message,'error');
+          return;
         }
+        if (!password) { setAuthError('請輸入密碼。'); return;}
+        if (password.length < 6) { setAuthError('密碼至少需要 6 個字元。'); return;}
+        if (authMode === 'signup' && !name) { setAuthError('請輸入調查員暱稱。'); return;}
+
+        setAuthLoading(true);
+
+        try {
+          // 註冊
+          if ( authMode === 'signup') {
+            const {data,error} =
+              await supabaseClient.auth
+                .signUp({
+                  email,
+                  password,
+                  options: { data: {full_name: name}}
+                });
+
+            console.log('SIGNUP DATA:',data);
+            console.log('SIGNUP ERROR:',error);
+
+            if (error) {
+              setAuthError( getAuthErrorMessage(error,'signup'));
+              return;
+            }
+
+
+            /*
+            * 某些情況下 Auth 為避免直接暴露「此帳號是否已存在」，不一定會回傳明確 error。
+            * 如果 identities 是空陣列，就給使用者較安全的提示。
+            */
+            if ( data?.user && Array.isArray( data.user.identities) && data.user.identities.length === 0) {
+              setAuthError('這個 Email 可能已經註冊過。請切換至登入；如果你先前尚未完成信箱驗證，也請查看信箱。');
+              return;
+            }
+
+            // 不需要 Email 驗證
+            if (data?.session) {
+              showToast('註冊成功，已登入！','success');
+              setAuthEmail('');
+              setAuthPassword('');
+              setAuthName('');
+              setShowAuthModal(false);
+              return;
+            }
+
+            // 需要 Email 驗證
+            setAuthInfo('註冊資料已送出！請前往 Email 信箱完成驗證，再回來登入。');
+
+            setAwaitingEmailVerification(true);
+
+            // 密碼不要留在畫面
+            setAuthPassword('');
+            return;
+
+          }
+
+          // 登入
+          const {data,error} = await supabaseClient.auth.signInWithPassword({email,password});
+          console.log('LOGIN DATA:',data);
+          console.log('LOGIN ERROR:',error);
+
+          if (error) {setAuthError(getAuthErrorMessage(error,'login')); return;}
+          showToast('歡迎歸來，調查員。','success');
+
+          setAuthEmail('');
+          setAuthPassword('');
+          setAuthName('');
+          setShowAuthModal(false);
+
+        } catch (err) {
+          console.error('Auth 未預期錯誤:',err);
+          setAuthError('系統發生未預期錯誤，請稍後再試。');
+        } finally {
+          setAuthLoading(false);
+        }
+
       };
 
       const handleLogout = async () => {
         if (supabaseClient) await supabaseClient.auth.signOut();
         showToast('已安全登出。', 'info');
+      };
+
+      // 重新寄送驗證信
+      const handleResendVerification = async () => {
+        const email = authEmail.trim();
+        if (!email) { return setAuthError('請先輸入註冊時使用的 Email。');}
+
+        setAuthError('');
+        setAuthInfo('');
+        setAuthLoading(true);
+
+        try {
+          const { error } = await supabaseClient.auth.resend({ type: 'signup',email});
+          console.log('✉️ resend verification:',error);
+          if (error) {setAuthError('重新寄送失敗：' + error.message); return;}
+          setAuthInfo('驗證信已重新寄送，請再次查看信箱與垃圾郵件匣。');
+        } catch (err) {
+          console.error('重寄驗證信錯誤:',err);
+          setAuthError('目前無法重新寄送驗證信，請稍後再試。');
+        } finally {
+          setAuthLoading(false);
+        }
+      };
+
+      // 設定新密碼
+      const handleRecoveryPasswordSubmit =
+        async (e) => {
+        e.preventDefault();
+        clearAuthFeedback();
+
+        if ( authPassword.length < 6) {return setAuthError('新密碼至少需要 6 個字元。');}
+        if ( authPassword !== authPasswordConfirm) {return setAuthError('兩次輸入的密碼不一致。');}
+
+        setAuthLoading(true);
+
+        try {
+          const {data,error} = await supabaseClient.auth.updateUser({password: authPassword});
+          console.log('🔐 更新密碼:',data,error);
+          if (error) {return setAuthError('密碼更新失敗：' + error.message);}
+
+          setAuthPassword('');
+          setAuthPasswordConfirm('');
+
+          setAuthMode('login');
+          setShowAuthModal(false);
+
+          showToast('密碼已更新，目前已成功登入。','success');
+
+        } catch (err) {
+          console.error('更新密碼錯誤:',err);
+          setAuthError('密碼更新失敗，請重新透過重設密碼信操作。');
+        } finally {
+          setAuthLoading(false);
+        }
+      };
+
+      // Recovery 模式的關閉
+      const handleCancelRecovery = async () => {
+        await supabaseClient.auth.signOut();
+        setAuthMode('login');
+        setAuthPassword('');
+        setAuthPasswordConfirm('');
+
+        setAuthError('');
+        setAuthInfo('');
+
+        setShowAuthModal(false);
       };
 
       /* 4. 報名與退團 */
@@ -554,19 +884,34 @@
           san: Number(newChar.san) || 50,
           max_san: 99,
           feature: newChar.feature || '無',
-          is_active: true
+          is_active: false
         };
 
         if (!isUsingMock && supabaseClient && currentUser) {
           payload.user_id = currentUser.id;
 
-          const { error } = await supabaseClient
-            .from('characters')
-            .insert(payload);
+          const { data: createdChar, error } =
+            await supabaseClient
+              .from('characters')
+              .insert(payload)
+              .select()
+              .single();
 
           if (error) {
             console.error('建立角色失敗:', error);
             return showToast('新增失敗：' + error.message, 'error');
+          }
+
+          // 第一張角色自動設為出戰
+          if (
+            characters.length === 0 &&
+            createdChar?.id
+          ) {
+            const { error: activeError } =
+              await supabaseClient.rpc('set_active_character',{p_character_id: createdChar.id});
+            if (activeError) {
+              console.error('設定初始出戰角色失敗:',activeError);
+            }
           }
 
           await fetchAllData();
@@ -660,17 +1005,118 @@
         }
       };
 
-      const handleAdminKick = (eventId, userId) => {
-        setEvents(prev => prev.map(evt => {
-          if (evt.id === eventId) {
-            return {
-              ...evt,
-              booked_investigators: evt.booked_investigators.filter(i => i.userId !== userId)
-            };
+      const handleAdminKick = async (eventId, userId) => {
+        if (accountRole !== 'admin') {return showToast('只有 Keeper 可以移除玩家。','error');}
+        try {
+          const { error } = await supabaseClient
+            .from('bookings')
+            .delete()
+            .eq('event_id', eventId)
+            .eq('user_id', userId);
+          console.log('🚪 Keeper 移除玩家:', eventId, userId, error);
+
+          if (error) { return showToast( '移除失敗：' + error.message, 'error');}
+          await fetchAllData();
+
+          showToast('已將該名調查員移出隊伍。','success');
+        } catch (err) {
+          console.error('移除玩家錯誤:',err);
+          showToast('移除失敗：' + err.message,'error');
+        }
+      };
+
+      // 事後KP加入玩家
+      const handleOpenAddParticipant = (evt) => {
+        if (accountRole !== 'admin') {
+          return showToast('只有 Keeper 可以手動加入玩家。','error');
+        }
+        if (evt.status !== 'open') {
+          return showToast('此團務目前不能新增玩家。','error');
+        }
+        setAddingParticipantEvent(evt);
+        setMemberSearch('');
+        setMemberSearchResults([]);
+      };
+
+      // 搜尋會員
+      const handleSearchMembers = async () => {
+        const keyword = memberSearch.trim();
+        if (keyword.length < 2) {
+          return showToast('請至少輸入 2 個字元。','error');
+        }
+
+        setSearchingMembers(true);
+
+        try {
+          const { data, error } = await supabaseClient.rpc('admin_search_members',{p_keyword: keyword});
+          console.log('🔎 Keeper 搜尋會員:',data,error);
+          if (error) {return showToast('搜尋失敗：' + error.message,'error');}
+
+          setMemberSearchResults(data || []);
+
+        } catch (err) {
+          console.error('搜尋會員錯誤:',err);
+          showToast('搜尋失敗：' + err.message,'error');
+        } finally {
+          setSearchingMembers(false);
+        }
+      };
+
+      // Keeper 手動加入玩家
+      const handleAdminAddParticipant =
+        async (characterId) => {
+        if (
+          !addingParticipantEvent ||
+          !characterId
+        ) {
+          return;
+        }
+
+        try {
+          const { data, error } =
+            await supabaseClient.rpc(
+              'admin_add_participant',
+              {
+                p_event_id: addingParticipantEvent.id,
+                p_character_id: characterId
+              }
+            );
+          console.log('➕ Keeper 加入玩家:',data,error);
+          if (error) { return showToast('加入失敗：' + error.message,'error');
           }
-          return evt;
-        }));
-        showToast('已將該名調查員移出隊伍。', 'info');
+
+          setAddingParticipantEvent(null);
+          setMemberSearch('');
+          setMemberSearchResults([]);
+          await fetchAllData();
+          showToast('已將角色加入本場團務。', 'success');
+
+        } catch (err) {
+          console.error('Keeper 加入玩家錯誤:',err);
+          showToast('加入失敗：' + err.message,'error');
+        }
+      };
+
+      // 取消團務
+      const handleAdminCancelEvent = async (evt) => {
+        if (accountRole !== 'admin') {
+          return showToast('只有 Keeper 可以取消團務。','error');
+        }
+        if (evt.status === 'completed') {
+          return showToast('已完成結算的團務不能取消。','error');
+        }
+
+        try {
+          const { data, error } = await supabaseClient.rpc('cancel_event', {p_event_id: evt.id});
+          console.log('🚫 取消團務:',data,error);
+          if (error) {return showToast('取消失敗：' + error.message,'error');}
+
+          await fetchAllData();
+          showToast('團務已取消，歷史資料仍會保留。','success');
+        } catch (err) {
+          console.error('取消團務錯誤:',err);
+          showToast('取消失敗：' + err.message,'error');
+        }
       };
 
       const handleAdminDeleteEvent = async (eventId) => {
@@ -687,6 +1133,11 @@
           console.error('刪除場次錯誤:',err);
           showToast('刪除失敗：' + err.message,'error');
         }
+      };
+
+      const canPermanentlyDeleteEvent = (evt) => {
+        const bookingCount = evt.booked_investigators?.length || 0;
+        return ( bookingCount === 0 && evt.status !== 'completed' );
       };
 
       // 編輯團務
@@ -796,6 +1247,8 @@
 
       // 團務結算
       const handleOpenSettlement = (evt) => {
+        if (!evt.booked_investigators?.length) { return showToast('目前沒有參團角色，無法進行結算。','error');}
+        if (evt.status !== 'open') {return showToast('此團務目前不能進行結算。','error');}
         if ( new Date(evt.event_date).getTime() > Date.now()) { return showToast( '團務尚未開始，無法結算。','error');}
         const initialNotes = {};
         evt.booked_investigators.forEach(inv => { initialNotes[inv.characterId] = '';});
@@ -834,6 +1287,74 @@
         showToast('團務結算完成，角色成長紀錄已發放。','success' );
       };
 
+      // 讀取成長紀錄
+      const fetchGrowthRecords = async () => {
+        if (!supabaseClient || !currentUser) {setGrowthRecords([]);return;}
+        const { data, error } =
+          await supabaseClient.from('character_growth_records')
+            .select(`
+              id, event_id, character_id, user_id, growth_note, created_at,
+              events( title, scenario_name, event_date)
+            `)
+            .eq('user_id', currentUser.id)
+            .order('created_at', {ascending: false});
+
+        console.log('📚 成長紀錄:',data,error);
+
+        if (error) { console.error('讀取成長紀錄失敗:',error); return;}
+        setGrowthRecords( data || []);
+      };
+
+      // 打開成長紀錄表
+      const handleOpenEditCharacter = (character) => {
+        setEditingCharacter(character);
+        setEditCharacterData({
+          name: character.name || '',
+          occupation: character.occupation || '',
+          san: character.san ?? 60,
+          max_san: character.max_san ?? 99,
+          feature: character.feature || ''
+        });
+      };
+
+      // 儲存編輯角色卡
+      const handleUpdateCharacter = async (e) => {
+        e.preventDefault();
+        if ( !currentUser || !editingCharacter) { return;}
+        const san = Number(editCharacterData.san);
+        const maxSan = Number(editCharacterData.max_san);
+
+        if (
+          !Number.isInteger(san) ||
+          !Number.isInteger(maxSan) ||
+          maxSan < 1 ||
+          maxSan > 99 ||
+          san < 0 ||
+          san > maxSan
+        ) {
+          return showToast( '請確認 SAN 與最大 SAN 設定。','error');
+        }
+
+        if (
+          !editCharacterData.name.trim()
+        ) {
+          return showToast('請輸入角色姓名。','error');
+        }
+
+        const payload = {
+          name: editCharacterData.name.trim(),
+          occupation: editCharacterData.occupation.trim(),
+          san,max_san: maxSan,
+          feature: editCharacterData.feature.trim()
+        };
+
+        const { error } = await supabaseClient.from('characters').update(payload).eq('id', editingCharacter.id).eq('user_id',currentUser.id);
+        console.log('✏️ 更新角色:', payload, error);
+        if (error) { return showToast('角色更新失敗：' + error.message, 'error');}
+        setEditingCharacter(null);
+        await fetchAllData();
+        showToast('角色卡已更新。','success');
+      };
 
       return (
         <div className="min-h-screen flex flex-col justify-between text-parchment font-sans">
@@ -920,7 +1441,7 @@
 
                 {/* 卡片網格 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {events.map((evt) => {
+                  {events.filter(evt => evt.status === 'open').map((evt) => {
                     const booked = evt.booked_investigators?.length || 0;
                     const isFull = booked >= evt.max_players;
                     const hasJoined = isBooked(evt);
@@ -1037,7 +1558,7 @@
                     </div>
                     <div className="bg-black/40 p-4 rounded-2xl border border-purple-950">
                       <strong className="text-copper block text-base mb-1">歷程繼承</strong>
-                      <span className="text-mutedText">完團自動獲取 EXP，累積稱號並永久記錄角色生還傳奇。</span>
+                      <span className="text-mutedText">完團後由 Keeper 發放角色成長紀錄，永久保存每次調查留下的變化與歷程。</span>
                     </div>
                   </div>
                 </div>
@@ -1080,7 +1601,6 @@
 
                           <div className="pt-4 border-t border-purple-950 flex items-center justify-between text-xs">
                             <span className="text-emerald-400 font-medium">生還：{r.survivors.join('、')}</span>
-                            <span className="text-copper font-bold bg-copper/10 px-2.5 py-1 rounded-lg">+{r.exp} EXP</span>
                           </div>
                         </div>
                       </div>
@@ -1097,23 +1617,25 @@
                 
                 {/* 頂部身分切換與帳號名片 */}
                 <div className="bg-cardBg rounded-3xl p-6 sm:p-8 border border-purple-900/40 shadow-modern-card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-start gap-4">
                     <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-copper to-amber-800 flex items-center justify-center text-3xl shadow-glow-purple">
                       🕵️‍♂️
                     </div>
                     <div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start gap-3">
                         <h2 className="text-2xl font-bold text-parchment">
                           {currentUser ? (profile?.display_name || currentUser.user_metadata?.full_name || currentUser.email) : '尚未登入'}
                         </h2>
-                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
-                          {accountRole === 'admin' ? 'Keeper 守密人' : '已認證調查員'}
-                        </span>
                       </div>
                       <p className="text-sm text-copper mt-0.5 font-medium">{accountRole === 'admin' ? 'Keeper 守密人' : 'Miskatonic 認證調查員'}</p>
                       <p className="text-xs text-mutedText mt-1">
                         狀態：{currentUser ? `登入帳號: ${currentUser.email}` : '未登入 (可隨時點擊右上角登入)'}
                       </p>
+                      {currentUser && (
+                        <button onClick={handleOpenProfileEdit} className="mt-3 px-3 py-1.5 bg-void hover:bg-cardHover border border-purple-900 text-xs text-copper rounded-xl transition">
+                          ✏️ 編輯會員資料
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1157,10 +1679,7 @@
                           </h3>
                           <p className="text-xs text-mutedText mt-1">報名時將預設攜帶「出戰中」的角色，亦可在報名視窗自由選擇。</p>
                         </div>
-                        <button
-                          onClick={() => setShowNewCharForm(true)}
-                          className="px-4 py-2 bg-mystic hover:bg-purple-600 text-white rounded-xl text-sm font-bold shadow-glow-purple transition"
-                        >
+                        <button onClick={() => setShowNewCharForm(true)} className="px-4 py-2 bg-mystic hover:bg-purple-600 text-white rounded-xl text-sm font-bold shadow-glow-purple transition">
                           + 快速建立新卡
                         </button>
                       </div>
@@ -1234,52 +1753,73 @@
 
                       {/* 角色卡列表 */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {characters.map(c => (
-                          <div 
-                            key={c.id}
-                            className={`p-5 rounded-2xl border transition-all ${
-                              c.is_active ? 'bg-cardHover border-copper shadow-glow-purple' : 'bg-cardBg border-purple-950'
-                            }`}
-                          >
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h4 className="text-lg font-bold text-parchment">{c.name}</h4>
-                                <span className="text-xs text-copper font-medium">{c.occupation}</span>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setCharacters(prev => prev.map(item => ({ ...item, is_active: item.id === c.id })));
-                                  setSelectedCharId(c.id);
-                                }}
-                                className={`text-xs px-3 py-1 rounded-xl font-bold transition ${
-                                  c.is_active ? 'bg-copper text-black' : 'bg-void text-mutedText hover:text-white border border-purple-900'
-                                }`}
-                              >
-                                {c.is_active ? '✓ 出戰中' : '設為出戰'}
-                              </button>
-                            </div>
+                        {characters.map(c => {
 
-                            {/* SAN 條 */}
-                            <div className="mt-3 space-y-1.5">
-                              <div className="flex justify-between text-xs font-semibold">
-                                <span className="text-mutedText">理智值 (SAN)</span>
-                                <span className={c.san < 40 ? 'text-red-400 animate-pulse font-bold' : 'text-emerald-400'}>
-                                  {c.san} / {c.max_san} {c.san < 40 && '【瀕臨瘋狂】'}
-                                </span>
+                          const charGrowthRecords =
+                            growthRecords.filter( record => record.character_id === c.id);
+
+                          return (
+                            <div 
+                              key={c.id}
+                              className={`p-5 rounded-2xl border transition-all ${
+                                c.is_active ? 'bg-cardHover border-copper shadow-glow-purple' : 'bg-cardBg border-purple-950'
+                              }`}
+                            >
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="text-lg font-bold text-parchment">{c.name}</h4>
+                                  <span className="text-xs text-copper font-medium">{c.occupation}</span>
+                                  <div className="mt-1">
+                                    <span className="text-[11px] px-2 py-0.5 rounded-lg bg-purple-950 text-purple-300 border border-purple-800">
+                                      {getCharacterTitle(c.san)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <button disabled={c.is_active} onClick={() => handleSetActiveCharacter(c.id)}
+                                  className={`text-xs px-3 py-1 rounded-xl font-bold transition ${
+                                    c.is_active
+                                      ? 'bg-copper text-black cursor-default'
+                                      : 'bg-void text-mutedText hover:text-white border border-purple-900'
+                                  }`}
+                                >
+                                  {c.is_active ? '✓ 出戰中' : '設為出戰'}
+                                </button>
                               </div>
-                              <div className="w-full bg-stone-900 h-2 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full ${c.san < 40 ? 'bg-red-500' : 'bg-emerald-500'}`}
-                                  style={{ width: `${(c.san / c.max_san) * 100}%` }}
-                                ></div>
+
+                              {/* SAN 條 */}
+                              <div className="mt-3 space-y-1.5">
+                                <div className="flex justify-between text-xs font-semibold">
+                                  <span className="text-mutedText">理智值 (SAN)</span>
+                                  <span className={c.san < 40 ? 'text-red-400 animate-pulse font-bold' : 'text-emerald-400'}>
+                                    {c.san} / {c.max_san} {c.san < 40 && '【瀕臨瘋狂】'}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-stone-900 h-2 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full ${c.san < 40 ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                    style={{ width: `${(c.san / c.max_san) * 100}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+
+                              <p className="text-xs text-mutedText mt-3 bg-void/60 p-3 rounded-xl border border-purple-950/60 leading-relaxed">
+                                {c.feature}
+                              </p>
+
+                              <div className="mt-4 pt-3 border-t border-purple-950 flex items-center justify-end gap-2">
+                                <button onClick={() => setGrowthRecordCharacter(c) } className="px-3 py-1.5 bg-purple-950 hover:bg-purple-900 border border-purple-700 text-purple-300 rounded-xl text-xs font-bold transition">
+                                  📜 成長紀錄
+                                  {charGrowthRecords.length > 0 && ` (${charGrowthRecords.length})`}
+                                </button>
+
+                                <button onClick={() => handleOpenEditCharacter(c)} className="px-3 py-1.5 bg-copper/10 hover:bg-copper/20 border border-copper/40 text-copper rounded-xl text-xs font-bold transition">
+                                  ✏️ 編輯角色
+                                </button>
+
                               </div>
                             </div>
-
-                            <p className="text-xs text-mutedText mt-3 bg-void/60 p-3 rounded-xl border border-purple-950/60 leading-relaxed">
-                              {c.feature}
-                            </p>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1327,7 +1867,7 @@
                         <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
                           <span className="text-crimson">⚡</span> Keeper 團務管理台
                         </h3>
-                        <p className="text-xs text-mutedText mt-1">檢視報名者資料、剔除不適任玩家或一鍵發放結算 EXP。</p>
+                        <p className="text-xs text-mutedText mt-1">檢視報名者資料、管理調查小隊並完成角色成長結算。</p>
                       </div>
 
                       <button
@@ -1361,45 +1901,105 @@
                               >
                                 {isEventChangeLocked( evt.event_date,evt.lock_hours ) ? '🔒 團務已鎖定' : '✏️ 修改團務'}
                               </button>
-                              {evt.status !== 'completed' && (
+                              {evt.status === 'open' && (
                                 <button onClick={() => handleOpenSettlement(evt)} className="px-3.5 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-600 text-emerald-300 rounded-xl text-xs font-bold transition">
                                   📜 團務結算
                                 </button>
                               )}
-                              <button onClick={() => handleAdminDeleteEvent(evt.id)} className="px-3 py-1.5 bg-stone-900 hover:bg-red-950 text-stone-400 hover:text-red-300 rounded-xl text-xs transition">
-                                刪除場次
+                              {evt.status === 'open' && (
+                                <button onClick={() => handleAdminCancelEvent(evt)} className="px-3 py-1.5 bg-red-950/40 hover:bg-red-950 border border-red-900 text-red-300 rounded-xl text-xs font-bold transition">
+                                  🚫 取消團務
+                                </button>
+                              )}
+                              <button disabled={!canPermanentlyDeleteEvent(evt)}
+                                onClick={() => handleAdminDeleteEvent(evt.id)} className={`px-3 py-1.5 rounded-xl text-xs transition ${
+                                  canPermanentlyDeleteEvent(evt)
+                                    ? 'bg-stone-900 hover:bg-red-950 text-stone-400 hover:text-red-300'
+                                    : 'bg-stone-950 text-stone-700 cursor-not-allowed'
+                                }`}
+                              >
+                                🗑 永久刪除
                               </button>
                             </div>
                           </div>
 
                           {/* 報名者聯絡清單 */}
                           <div className="space-y-2">
-                            <span className="text-xs font-semibold text-copper block">
-                              報名調查員清單 ({evt.booked_investigators.length} / {evt.max_players} 人)：
-                            </span>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-xs font-semibold text-copper">
+                                報名調查員清單
+                                ({evt.booked_investigators.length} / {evt.max_players} 人)：
+                              </span>
+
+                              {evt.status === 'open' && (
+                                <button disabled={evt.booked_investigators.length >= evt.max_players}
+                                  onClick={() => handleOpenAddParticipant(evt)}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                                    evt.booked_investigators.length >=
+                                    evt.max_players
+                                      ? 'bg-stone-950 text-stone-700 cursor-not-allowed'
+                                      : 'bg-copper/10 hover:bg-copper/20 border border-copper/40 text-copper'
+                                  }`}
+                                >
+                                  {evt.booked_investigators.length >=
+                                  evt.max_players
+                                    ? '席位已滿'
+                                    : '＋ Keeper 加入角色'
+                                  }
+                                </button>
+                              )}
+                            </div>
 
                             {evt.booked_investigators.length === 0 ? (
                               <div className="text-xs text-mutedText py-2 italic">尚無調查員加入。</div>
                             ) : (
                               <div className="divide-y divide-purple-950 border border-purple-950 rounded-2xl overflow-hidden bg-void/50">
-                                {evt.booked_investigators.map(inv => (
-                                  <div key={inv.userId} className="p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
-                                    <div>
-                                      <span className="text-sm font-bold text-parchment">{inv.charName}</span>
-                                      <span className="text-copper ml-2">({inv.occupation} • SAN: {inv.san})</span>
-                                      <div className="text-mutedText mt-1 flex gap-3">
-                                        <span>LINE: <strong className="text-emerald-400">{inv.lineId}</strong></span>
-                                        <span>手機: <strong className="text-amber-400">{inv.phone}</strong></span>
+                                {evt.booked_investigators.map(inv => {
+                                  const contact = adminProfiles[inv.userId];
+
+                                  return (
+
+                                    <div key={inv.userId} className="p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                                      <div>
+                                        <span className="text-sm font-bold text-parchment">{inv.charName}</span>
+                                        <span className="text-copper ml-2">({inv.occupation} • SAN: {inv.san})</span>
+                                        <div className="text-mutedText mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                          {contact?.email && (
+                                            <span>
+                                              Email：
+                                              <strong className="text-blue-300">
+                                                {contact.email}
+                                              </strong>
+                                            </span>
+                                          )}
+                                          {contact?.line_id && (
+                                            <span>
+                                              LINE：
+                                              <strong className="text-emerald-400">
+                                                {contact.line_id}
+                                              </strong>
+                                            </span>
+                                          )}
+                                          {contact?.phone && (
+                                            <span>
+                                              手機：
+                                              <strong className="text-amber-400">
+                                                {contact.phone}
+                                              </strong>
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
+                                      <button
+                                        onClick={() => handleAdminKick(evt.id, inv.userId)}
+                                        className="px-3 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 rounded-lg text-xs transition border border-red-900/60"
+                                      >
+                                        踢出隊伍
+                                      </button>
                                     </div>
-                                    <button
-                                      onClick={() => handleAdminKick(evt.id, inv.userId)}
-                                      className="px-3 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 rounded-lg text-xs transition border border-red-900/60"
-                                    >
-                                      踢出隊伍
-                                    </button>
-                                  </div>
-                                ))}
+                                  );
+
+                                })}
                               </div>
                             )}
                           </div>
@@ -1559,71 +2159,208 @@
                 
                 <div className="flex justify-between items-center border-b border-purple-950 pb-3">
                   <h3 className="text-xl font-bold font-gothic text-copper">
-                    {authMode === 'login' ? '調查員身分驗證' : '新調查員登錄註冊'}
+                    {authMode === 'recovery'
+                      ? '重設調查員密碼'
+                      : authMode === 'forgot'
+                        ? '找回調查員身分'
+                        : authMode === 'signup'
+                          ? '新調查員登錄註冊'
+                          : '調查員身分驗證'
+                    }
                   </h3>
                   <button 
-                    onClick={() => setShowAuthModal(false)}
+                    onClick={
+                      authMode === 'recovery'
+                        ? handleCancelRecovery
+                        : handleCloseAuthModal
+                    }
                     className="text-mutedText hover:text-white"
                   >
                     ✕
                   </button>
                 </div>
 
-                <form onSubmit={handleAuthSubmit} className="space-y-4 text-sm">
+                <form onSubmit={authMode === 'recovery' ? handleRecoveryPasswordSubmit : handleAuthSubmit} noValidate className="space-y-4 text-sm">
+                  {authMode === 'recovery' && (
+                    <>
+                      <div>
+                        <label className="block text-xs text-mutedText mb-1">
+                          新密碼
+                        </label>
+                        <input required disabled={authLoading} type="password" minLength="6"
+                          placeholder="至少 6 位密碼"
+                          value={authPassword}
+                          onChange={e => {setAuthPassword(e.target.value); clearAuthFeedback();}}
+                          className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-mutedText mb-1">
+                          再次確認新密碼
+                        </label>
+                        <input required disabled={authLoading} type="password" minLength="6"
+                          placeholder="再次輸入新密碼"
+                          value={authPasswordConfirm}
+                          onChange={e => {setAuthPasswordConfirm(e.target.value); clearAuthFeedback();}}
+                          className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
+                        />
+                      </div>
+                    </>
+                  )}
+
                   {authMode === 'signup' && (
                     <div>
                       <label className="block text-xs text-mutedText mb-1">調查員代號 / 暱稱</label>
-                      <input
-                        required
-                        type="text"
+                      <input required disabled={authLoading} type="text"
                         placeholder="例：阿卡姆神祕客"
                         value={authName}
-                        onChange={e => setAuthName(e.target.value)}
-                        className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
+                        onChange={e => {
+                          setAuthName(e.target.value);
+                          clearAuthFeedback();
+                        }}
+                        className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment disabled:opacity-50"
                       />
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-xs text-mutedText mb-1">聯絡信箱 (Email)</label>
-                    <input
-                      required
-                      type="email"
-                      placeholder="investigator@arkham.edu"
-                      value={authEmail}
-                      onChange={e => setAuthEmail(e.target.value)}
-                      className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
-                    />
-                  </div>
+                  {authMode !== 'recovery' && (
+                    <div>
+                      <label className="block text-xs text-mutedText mb-1">聯絡信箱 (Email)</label>
+                      <input required disabled={authLoading} type="email"
+                        placeholder="investigator@arkham.edu"
+                        value={authEmail}
+                        onChange={e => {
+                          setAuthEmail(e.target.value);
+                          clearAuthFeedback();
+                        }}
+                        className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment disabled:opacity-50"
+                      />
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="block text-xs text-mutedText mb-1">通關密碼</label>
-                    <input
-                      required
-                      type="password"
-                      placeholder="至少 6 位密碼"
-                      value={authPassword}
-                      onChange={e => setAuthPassword(e.target.value)}
-                      className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-gradient-to-r from-mystic to-purple-800 hover:from-purple-600 hover:to-mystic text-white font-bold rounded-xl transition shadow-glow-purple"
+                  {(authMode === 'login' || authMode === 'signup') && (
+                    <div>
+                      <label className="block text-xs text-mutedText mb-1">通關密碼</label>
+                      <input required disabled={authLoading} type="password" minLength="6"
+                        placeholder="至少 6 位密碼"
+                        value={authPassword}
+                        onChange={e => {
+                          setAuthPassword(e.target.value);
+                          clearAuthFeedback();
+                        }}
+                        className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment disabled:opacity-50"
+                      />
+                    </div>
+                  )}
+                  {/* Auth 錯誤訊息 */}
+                  {authError && (
+                    <div className="p-3.5 rounded-xl bg-red-950/60 border border-red-700 text-red-200 text-xs leading-relaxed">
+                      <div className="flex items-start gap-2">
+                        <span>⚠️</span>
+                        <span>{authError}</span>
+                      </div>
+                    </div>
+                  )}
+                  {/* Auth 一般提示 */}
+                  {authInfo && (
+                    <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800 text-emerald-200 text-xs leading-relaxed">
+                      <div className="flex items-start gap-2">
+                        <span>✉️</span>
+                        <span>{authInfo}</span>
+                      </div>
+                    </div>
+                  )}
+                  {/* 重新寄送驗證信 */}
+                  {awaitingEmailVerification && (
+                    <button type="button" disabled={authLoading} onClick={handleResendVerification} className="w-full py-2.5 bg-void hover:bg-cardHover border border-purple-800 text-purple-300 rounded-xl text-xs font-bold transition disabled:opacity-50">
+                      ✉️ 重新寄送驗證信
+                    </button>
+                  )}
+                  
+                  <button type="submit" disabled={authLoading}
+                    className={`w-full py-3 font-bold rounded-xl transition shadow-glow-purple ${
+                      authLoading
+                        ? 'bg-stone-900 text-stone-500 cursor-wait'
+                        : 'bg-gradient-to-r from-mystic to-purple-800 hover:from-purple-600 hover:to-mystic text-white'
+                    }`}
                   >
-                    {authMode === 'login' ? '立即驗證登入' : '完成註冊簽名'}
+                    {authLoading
+                      ? (
+                          authMode === 'recovery'
+                            ? '更新密碼中...'
+                            : authMode === 'forgot'
+                              ? '寄送中...'
+                              : authMode === 'signup'
+                                ? '建立調查員檔案中...'
+                                : '驗證身分中...'
+                        )
+                      : (
+                          authMode === 'recovery'
+                            ? '設定新的登入密碼'
+                            : authMode === 'forgot'
+                              ? '寄送密碼重設信'
+                              : authMode === 'signup'
+                                ? '完成註冊簽名'
+                                : '立即驗證登入'
+                        )
+                    }
                   </button>
+                  {authMode === 'login' && (
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        disabled={authLoading}
+                        onClick={() => handleSwitchAuthMode('forgot')}
+                        className="text-xs text-mutedText hover:text-copper transition"
+                      >
+                        忘記密碼？
+                      </button>
+                    </div>
+                  )}
                 </form>
 
                 <div className="pt-2 text-center text-xs text-mutedText">
                   {authMode === 'login' ? (
-                    <span>初次造訪本社？ <button onClick={() => setAuthMode('signup')} className="text-copper hover:underline font-bold">註冊新帳號</button></span>
-                  ) : (
-                    <span>已有調查員身分？ <button onClick={() => setAuthMode('login')} className="text-copper hover:underline font-bold">返回登入</button></span>
-                  )}
+                    <span>
+                      初次造訪本社？{' '}
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchAuthMode('signup')}
+                        className="text-copper hover:underline font-bold"
+                      >
+                        註冊新帳號
+                      </button>
+                    </span>
+                  ) : authMode === 'signup' ? (
+                    <span>
+                      已有調查員身分？{' '}
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchAuthMode('login')}
+                        className="text-copper hover:underline font-bold"
+                      >
+                        返回登入
+                      </button>
+                    </span>
+                  ) : authMode === 'forgot' ? (
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchAuthMode('login')}
+                      className="text-copper hover:underline font-bold"
+                    >
+                      ← 返回登入
+                    </button>
+                  ) : authMode === 'recovery' ? (
+                    <button
+                      type="button"
+                      onClick={handleCancelRecovery}
+                      className="text-mutedText hover:text-red-300 transition"
+                    >
+                      取消重設並登出
+                    </button>
+                  ) : null}
+                  
                 </div>
-
               </div>
             </div>
           )}
@@ -1659,6 +2396,7 @@
               </div>
             </div>
           )}
+
           {/* ==========================================
               彈窗：編輯團務 (Keeper 專用)
             ========================================== */}
@@ -1719,6 +2457,419 @@
                   <div className="flex justify-end gap-3 pt-3 border-t border-purple-950">
                     <button type="button" onClick={() => setEditingEvent(null)} className="px-4 py-2 text-sm text-mutedText hover:text-white transition">取消</button>
                     <button type="submit" className="px-5 py-2 bg-copper hover:bg-copperDark text-black font-bold text-sm rounded-xl transition">儲存修改</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================
+              彈窗：團務結算 (Keeper 專用)
+            ========================================== */}
+          {settlingEvent && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="bg-cardBg border border-emerald-700/50 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <div className="flex justify-between items-start pb-4 border-b border-purple-950">
+                  <div>
+                    <div className="text-xs text-emerald-400 font-bold">
+                      KEEPER SESSION SETTLEMENT
+                    </div>
+                    <h3 className="text-2xl font-bold text-parchment mt-1">
+                      📜 團務結算
+                    </h3>
+                    <p className="text-sm text-copper mt-1">
+                      {settlingEvent.title}
+                    </p>
+                    <p className="text-xs text-mutedText mt-1">
+                      {settlingEvent.scenario_name}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => {setSettlingEvent(null);setGrowthNotes({});}} className="w-8 h-8 rounded-full bg-void text-mutedText hover:text-white">✕</button>
+                </div>
+
+                <form onSubmit={handleSettleEvent} className="mt-6 space-y-5">
+
+                  {settlingEvent.booked_investigators.map(
+                    inv => (
+                      <div key={inv.characterId} className="bg-void border border-purple-950 rounded-2xl p-5">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div>
+                            <div className="text-base font-bold text-parchment">
+                              {inv.charName}
+                            </div>
+                            <div className="text-xs text-copper mt-0.5">
+                              {inv.occupation}
+                            </div>
+                          </div>
+                          <span className="text-xs text-emerald-300 bg-emerald-950 px-2.5 py-1 rounded-lg border border-emerald-800">
+                            SAN {inv.san}
+                          </span>
+                        </div>
+                        <label className="block text-xs text-mutedText mb-2">
+                          本次角色成長紀錄 *
+                        </label>
+
+                        <textarea required rows="5"
+                          placeholder={`例如：
+                            SAN -5
+                            偵查 +3
+                            新增狀態：對深海產生恐懼
+                            獲得道具：銀製鑰匙`}
+                          value={
+                            growthNotes[
+                              inv.characterId
+                            ] || ''
+                          }
+                          onChange={e => setGrowthNotes({...growthNotes,[inv.characterId]: e.target.value})}
+                          className="w-full bg-cardBg border border-purple-900 rounded-xl p-3 text-sm text-parchment resize-y focus:outline-none focus:border-emerald-700"
+                        />
+                      </div>
+                    )
+                  )}
+
+                  <div className="bg-emerald-950/20 border border-emerald-900 rounded-xl p-4 text-xs text-mutedText leading-relaxed">
+                    完成結算後，每位玩家都會在自己的角色卡中收到這份成長紀錄。
+                    玩家可依照紀錄自行修改 SAN、能力、狀態或道具。
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-4 border-t border-purple-950">
+                    <button type="button" onClick={() => {setSettlingEvent(null);setGrowthNotes({});}} className="px-4 py-2 text-sm text-mutedText hover:text-white">
+                      取消
+                    </button>
+                    <button type="submit" className="px-5 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition">
+                      ✓ 完成團務結算
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================
+              彈窗：Keeper 手動加入玩家
+            ========================================== */}
+          {addingParticipantEvent && (
+            <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <div className="flex justify-between items-start pb-4 border-b border-purple-950">
+                  <div>
+                    <div className="text-xs text-copper font-bold">
+                      KEEPER MANUAL REGISTRATION
+                    </div>
+                    <h3 className="text-xl font-bold text-parchment mt-1">
+                      ＋ 手動加入調查員
+                    </h3>
+                    <p className="text-xs text-mutedText mt-1">
+                      {addingParticipantEvent.title}
+                    </p>
+                  </div>
+
+                  <button type="button" onClick={() => {
+                      setAddingParticipantEvent(null);
+                      setMemberSearch('');
+                      setMemberSearchResults([]);
+                    }}
+                    className="w-8 h-8 rounded-full bg-void text-mutedText hover:text-white"
+                  >
+                    ✕
+                  </button>
+
+                </div>
+
+                {/* 搜尋 */}
+                <div className="mt-5">
+                  <label className="block text-xs text-mutedText mb-2">
+                    搜尋會員
+                  </label>
+                  <div className="flex gap-2">
+                    <input type="text" placeholder="輸入會員暱稱、Email、LINE 或手機" value={memberSearch}
+                      onChange={e => setMemberSearch(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') {e.preventDefault();handleSearchMembers();}}}
+                      className="flex-1 bg-void border border-purple-900 rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                    />
+                    <button type="button" onClick={handleSearchMembers} disabled={searchingMembers} className="px-4 py-2 bg-copper hover:bg-copperDark text-black rounded-xl text-sm font-bold">
+                      {searchingMembers ? '搜尋中...' : '搜尋'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 搜尋結果 */}
+                <div className="mt-5 space-y-3">
+                  {memberSearchResults.length === 0 ? (
+                    <div className="bg-void/50 border border-dashed border-purple-950 rounded-2xl p-6 text-center text-xs text-mutedText">
+                      輸入會員資料搜尋，
+                      再選擇要加入本場團務的角色。
+                    </div>
+                  ) : (
+                    memberSearchResults.map(
+                      (result, index) => {
+                        const alreadyJoined = addingParticipantEvent.booked_investigators.some(inv => inv.userId === result.user_id);
+                        return (
+                          <div key={ result.character_id || `${result.user_id}-${index}`} className="bg-void border border-purple-950 rounded-2xl p-4">
+                            <div className="flex flex-col sm:flex-row justify-between gap-4">
+                              <div>
+                                <div className="font-bold text-parchment">
+                                  {result.display_name || '未設定暱稱'}
+                                </div>
+                                <div className="text-xs text-mutedText mt-1">
+                                  {result.email}
+                                </div>
+
+                                {(result.line_id || result.phone) && (
+                                  <div className="text-[11px] text-mutedText mt-1">
+                                    {result.line_id && `LINE：${result.line_id}`}
+                                    {result.line_id && result.phone && ' ｜ '}
+                                    {result.phone && `手機：${result.phone}`}
+                                  </div>
+                                )}
+
+                                {result.character_id ? (
+                                  <div className="mt-3 bg-cardBg border border-purple-900 rounded-xl p-3">
+                                    <div className="text-sm font-bold text-copper">
+                                      {result.character_name}
+                                    </div>
+                                    <div className="text-xs text-mutedText mt-1">
+                                      {result.occupation}
+                                      {' • '}
+                                      SAN {result.san}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="mt-3 text-xs text-red-300">
+                                    此會員尚未建立角色卡
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center">
+                                <button type="button"
+                                  disabled={
+                                    !result.character_id ||
+                                    alreadyJoined
+                                  }
+                                  onClick={() => handleAdminAddParticipant(result.character_id)}
+                                  className={`px-4 py-2 rounded-xl text-xs font-bold ${
+                                    !result.character_id ||
+                                    alreadyJoined
+                                      ? 'bg-stone-900 text-stone-600 cursor-not-allowed'
+                                      : 'bg-emerald-900 hover:bg-emerald-800 text-emerald-100'
+                                  }`}
+                                >
+                                  {alreadyJoined
+                                    ? '已在隊伍中'
+                                    : !result.character_id
+                                      ? '無角色'
+                                      : '加入團務'
+                                  }
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                    )
+                  )}
+                </div>
+
+                <div className="mt-5 bg-copper/5 border border-copper/20 rounded-xl p-4 text-xs text-mutedText leading-relaxed">
+                  Keeper 手動加入不受 36 小時鎖定限制。
+                  被加入的角色會正式寫入團務名冊，
+                  因此之後團務結算時也能正常收到角色成長紀錄。
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================
+              彈窗：跑團成長 (Member 專用)
+            ========================================== */}
+          {growthRecordCharacter && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="bg-cardBg border border-purple-700/50 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl max-h-[85vh] overflow-y-auto custom-scrollbar">
+                <div className="flex justify-between items-start pb-4 border-b border-purple-950">
+                  <div>
+                    <div className="text-xs text-copper">
+                      調查員成長檔案
+                    </div>
+                    <h3 className="text-2xl font-bold text-parchment mt-1">
+                      {growthRecordCharacter.name}
+                    </h3>
+                    <p className="text-xs text-mutedText mt-1">
+                      {getCharacterTitle( growthRecordCharacter.san)}
+                    </p>
+                  </div>
+
+                  <button onClick={() => setGrowthRecordCharacter(null)} className="w-8 h-8 rounded-full bg-void text-mutedText hover:text-white">✕</button>
+                </div>
+
+                <div className="mt-5 space-y-4">
+                  {growthRecords.filter( record => record.character_id === growthRecordCharacter.id).length === 0 ? (
+                    <div className="p-6 text-center bg-void rounded-2xl border border-purple-950 text-sm text-mutedText">
+                      這名調查員目前尚無成長紀錄。
+                    </div>
+                  ) : ( growthRecords.filter( record => record.character_id === growthRecordCharacter.id)
+                      .map(record => (
+                        <div key={record.id} className="bg-void rounded-2xl border border-purple-950 p-5 space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-bold text-parchment">
+                                {record.events?.title || '未知團務'}
+                              </div>
+                              <div className="text-xs text-copper mt-0.5">
+                                {record.events?.scenario_name}
+                              </div>
+                            </div>
+                            <div className="text-xs text-mutedText">
+                              {new Date( record.created_at).toLocaleDateString('zh-TW')}
+                            </div>
+                          </div>
+
+                          <div className="border-t border-purple-950 pt-3">
+                            <div className="text-xs text-mutedText mb-2">
+                              Keeper 成長紀錄
+                            </div>
+                            <div className="text-sm text-parchment leading-relaxed whitespace-pre-wrap bg-cardBg p-4 rounded-xl border border-purple-900/50">
+                              {record.growth_note}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+
+                <div className="mt-6 p-4 rounded-2xl bg-copper/5 border border-copper/20 text-xs text-mutedText leading-relaxed">
+                  💡 完成閱讀後，請依照 Keeper 提供的成長紀錄，
+                  自行更新角色卡中的 SAN、屬性、狀態、裝備或其他資料。
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================
+              彈窗：編輯會員資料
+            ========================================== */}
+          {showProfileEdit && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl">
+                <div className="flex justify-between items-start mb-5">
+                  <div>
+                    <div className="text-xs text-copper">
+                      INVESTIGATOR PROFILE
+                    </div>
+                    <h3 className="text-xl font-bold text-parchment">
+                      編輯會員資料
+                    </h3>
+                  </div>
+                  <button type="button" onClick={() => setShowProfileEdit(false)} className="w-8 h-8 bg-void rounded-full text-mutedText hover:text-white">✕</button>
+                </div>
+
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">
+                      調查員暱稱 *
+                    </label>
+                    <input required type="text" value={profileForm.display_name}
+                      onChange={e => setProfileForm({...profileForm, display_name: e.target.value})}
+                      className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">
+                      Email
+                    </label>
+                    <input disabled value={ profile?.email || currentUser?.email || ''} className="w-full bg-stone-950 border border-stone-800 rounded-xl p-2.5 text-stone-500 cursor-not-allowed"/>
+                    <p className="text-[11px] text-mutedText mt-1">
+                      Email 為登入帳號，目前不在此處修改。
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">
+                      LINE ID
+                    </label>
+                    <input type="text" value={profileForm.line_id}
+                      onChange={e => setProfileForm({...profileForm, line_id: e.target.value})}
+                      className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">
+                      手機
+                    </label>
+                    <input type="tel" value={profileForm.phone}
+                      onChange={e => setProfileForm({...profileForm, phone: e.target.value})}
+                      className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"
+                    />
+                  </div>
+
+                  <div className="bg-copper/5 border border-copper/20 rounded-xl p-3 text-xs text-mutedText leading-relaxed">
+                    Email 會作為基本會員識別；LINE 與手機皆為選填，
+                    主要提供 Keeper 在團務需要時聯絡使用。
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-3 border-t border-purple-950">
+                    <button type="button" onClick={() => setShowProfileEdit(false)} className="px-4 py-2 text-sm text-mutedText hover:text-white">
+                      取消
+                    </button>
+                    <button type="submit" className="px-5 py-2 bg-copper hover:bg-copperDark text-black rounded-xl text-sm font-bold">
+                      儲存會員資料
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================
+              彈窗：編輯角色成長 (Member 專用)
+            ========================================== */}
+          {editingCharacter && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl">
+                <div className="flex justify-between items-start mb-5">
+                  <div>
+                    <div className="text-xs text-copper">
+                      調查員檔案管理
+                    </div>
+                    <h3 className="text-xl font-bold text-parchment">
+                      編輯角色卡
+                    </h3>
+                  </div>
+                  <button type="button" onClick={() => setEditingCharacter(null)} className="w-8 h-8 bg-void rounded-full text-mutedText hover:text-white">✕</button>
+                </div>
+
+                <form onSubmit={handleUpdateCharacter} className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">姓名</label>
+                    <input required value={editCharacterData.name} onChange={e => setEditCharacterData({...editCharacterData, name: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"/>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">職業</label>
+                    <input required value={editCharacterData.occupation} onChange={e => setEditCharacterData({...editCharacterData, occupation: e.target.value})}  className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"/>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-mutedText mb-1">目前 SAN</label>
+                      <input required type="number" min="0" max="99" value={editCharacterData.san} onChange={e => setEditCharacterData({...editCharacterData, san: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"/>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-mutedText mb-1">最大 SAN</label>
+                      <input required type="number" min="1" max="99" value={editCharacterData.max_san} onChange={e => setEditCharacterData({...editCharacterData, max_san: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment"/>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-mutedText mb-1">背景／特殊信物</label>
+                    <textarea rows="4" value={editCharacterData.feature} onChange={e => setEditCharacterData({...editCharacterData,feature: e.target.value})} className="w-full bg-void border border-purple-900 rounded-xl p-2.5 text-parchment resize-none"/>
+                  </div>
+                  <div className="bg-void/60 border border-purple-950 rounded-xl p-3">
+                    <div className="text-xs text-mutedText">目前稱號</div>
+                    <div className="text-sm text-copper font-bold mt-1">{getCharacterTitle( editCharacterData.san)}</div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-3 border-t border-purple-950">
+                    <button type="button" onClick={() => setEditingCharacter(null)} className="px-4 py-2 text-sm text-mutedText hover:text-white">取消</button>
+                    <button type="submit" className="px-5 py-2 bg-copper hover:bg-copperDark text-black rounded-xl text-sm font-bold">儲存角色卡</button>
                   </div>
                 </form>
               </div>
