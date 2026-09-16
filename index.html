@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>密斯卡託尼克探險社 | CoC TRPG 現代預約管理系統</title>
+  <title>CoC TRPG 預約管理系統 beta</title>
   
   <!-- Google Fonts: Cinzel (神秘古典) & Noto Sans TC / Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,10 +29,10 @@
           colors: {
             void: '#09070f', cardBg: '#27212d', cardHover: '#302837',
             borderDefault: '#8b7c98', borderHighlight: '#8b7c98',
-            mystic: '#9d4edd', mysticDark: '#3b185f',
+            mystic: '#9d4edd', mysticDark: '#4a2075',
             copper: '#d4a373', copperDark: '#ffc165',
             crimson: '#e11d48', crimsonDark: '#881337',
-            parchment: '#f1ebd9', mutedText: '#9f98af',
+            parchment: '#f1ebd9', mutedText: '#9f98af', greyText: '#c1c1c1',
           },
           fontFamily: {
             gothic: ['Cinzel', 'serif'],
@@ -2286,20 +2286,20 @@
                 'bg-cardBg border-mystic text-parchment'
               }`}>
                 <span>{toast.type === 'error' ? '⚠️' : '📜'}</span>
-                <span className="font-medium text-sm">{toast.msg}</span>
+                <span className="font-medium text-s">{toast.msg}</span>
               </div>
             </div>
           )}
 
           {/* 頂部極簡現代導航 */}
           <header className="sticky top-0 z-30 bg-void/85 backdrop-blur-xl border-b border-borderHighlight/30">
-            <div className="max-w-6xl mx-auto px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="max-w-7xl mx-auto px-5 py-4 flex s:flex-row s:items-center justify-between gap-4">
               
               {/* Logo */}
               <div onClick={() => setCurrentTab('lobby')} className="flex items-center gap-3 cursor-pointer group">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-mystic to-purple-950 flex items-center justify-center shadow-glow-purple">⍟</div>
                 <div>
-                  <h1 className="font-gothic text-lg font-bold text-parchment">MISKATONIC</h1>
+                  <h1 className="font-gothic text-lg font-bold text-parchment">Call of Cthulhu 7th</h1>
                   <p className="text-[10px] text-copper tracking-widest uppercase">TRPG Reservation System</p>
                 </div>
               </div>
@@ -2307,16 +2307,16 @@
               {/* 導航 Tabs 與登入狀態 */}
               <div className="flex items-center gap-3">
                 <nav className="flex items-center gap-2">
-                  <button onClick={() => setCurrentTab('lobby')} className={`px-4 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap ${currentTab === 'lobby' ? 'bg-mysticDark/60 text-white border border-mystic/40 shadow-glow-purple' : 'text-mutedText hover:text-white'}`}>跑團大廳</button>
-                  <button onClick={() => setCurrentTab('archive')} className={`px-4 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap ${currentTab === 'archive' ? 'bg-mysticDark/60 text-white border border-mystic/40 shadow-glow-purple' : 'text-mutedText hover:text-white'}`}>花絮檔案</button>
-                  <button onClick={() => setCurrentTab('portal')} className={`px-4 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap ${currentTab === 'portal' ? 'bg-copper/20 text-copper border border-copper/50 shadow-glow-purple' : 'text-mutedText hover:text-copper'}`}>🗂 會員手帳</button>
+                  <button onClick={() => setCurrentTab('lobby')} className={`px-4 py-2 rounded-xl text-s font-medium transition whitespace-nowrap ${currentTab === 'lobby' ? 'bg-mysticDark/70 text-white border border-mystic/40 shadow-glow-purple' : 'text-greyText hover:text-white'}`}>跑團大廳</button>
+                  <button onClick={() => setCurrentTab('archive')} className={`px-4 py-2 rounded-xl text-s font-medium transition whitespace-nowrap ${currentTab === 'archive' ? 'bg-mysticDark/70 text-white border border-mystic/40 shadow-glow-purple' : 'text-greyText hover:text-white'}`}>花絮檔案</button>
+                  <button onClick={() => setCurrentTab('portal')} className={`px-4 py-2 rounded-xl text-s font-medium transition whitespace-nowrap ${currentTab === 'portal' ? 'bg-copper/20 text-copper border border-copper/50 shadow-glow-purple' : 'text-greyText hover:text-copper'}`}>🗂 會員手帳</button>
                 </nav>
 
                 <div className="border-l border-borderHighlight pl-2 ml-1 flex items-center">
                   {currentUser ? (
-                    <button onClick={handleLogout} className="px-3 py-2 text-xs text-red-400 hover:bg-red-950/30 rounded-xl transition">登出</button>
+                    <button onClick={handleLogout} className="px-3 py-2 text-s text-red-400 hover:bg-red-950/30 rounded-xl transition hover:text-red-300">登出</button>
                   ) : (
-                    <button onClick={() => setShowAuthModal(true)} className="px-4 py-2 bg-copper hover:bg-copperDark text-black text-xs font-bold rounded-xl transition shadow-glow-purple whitespace-nowrap">登入/註冊</button>
+                    <button onClick={() => setShowAuthModal(true)} className="px-4 py-2 bg-copper hover:bg-copperDark text-black text-s font-bold rounded-xl transition shadow-glow-purple whitespace-nowrap">登入/註冊</button>
                   )}
                 </div>
               </div>
@@ -2325,22 +2325,22 @@
           </header>
 
           {/* 主要內容區 */}
-          <main className="max-w-6xl mx-auto px-5 py-10 flex-1 w-full">
+          <main className="max-w-7xl mx-auto px-5 py-10 flex-1 w-full">
             
             {/* ====== 分頁 1: 跑團大廳 ====== */}
             {currentTab === 'lobby' && (
               <div className="space-y-8">
                 
                 {/* 氛圍 Banner */}
-                <div className="relative rounded-3xl bg-gradient-to-r from-cardBg via-[#1c152e] to-cardBg p-8 border border-purple-500/20 shadow-modern-card overflow-hidden">
+                <div className="relative rounded-3xl bg-gradient-to-r from-cardBg via-[#1c152e] to-cardBg p-8 border border-borderHighlight/50 shadow-modern-card overflow-hidden">
                   <div className="max-w-2xl space-y-3 relative z-10">
                     <div className="flex items-center gap-2">
                       <span className="text-xs uppercase tracking-widest text-copper bg-copper/10 px-3 py-1 rounded-full border border-copper/30">
-                        ★ 每週精選團務預約
+                        ★ 精選團務預約
                       </span>
                       {!isUsingMock ? (
                         <span className="text-xs text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-800">
-                          ● Supabase 即時同步中
+                          ● 招募更新團務中
                         </span>
                       ) : (
                         <span className="text-xs text-purple-300 bg-purple-950/80 px-2.5 py-0.5 rounded-full border border-purple-800">
@@ -2348,11 +2348,11 @@
                         </span>
                       )}
                     </div>
-                    <h2 className="text-3xl sm:text-4xl font-gothic font-bold text-parchment leading-tight">
+                    <h2 className="text-3xl s:text-4xl font-gothic font-bold text-parchment leading-tight">
                       深淵正靜候勇敢的調查員。
                     </h2>
                     <p className="text-base text-mutedText leading-relaxed">
-                      點選任一卡片即可即時查看小隊名單並快速報名。出團時間截止時將鎖定席位。
+                      點選卡片查看並快速報名。出團時間截止時將鎖定席位。
                     </p>
                   </div>
                 </div>
@@ -2375,14 +2375,14 @@
 
                       return (
                         <div key={evt.id} onClick={() => {setActiveEvent(evt); setLockAlertMessage(null);}}
-                          className="group bg-cardBg hover:bg-cardHover rounded-3xl p-5 border border-borderHighlight/30 hover:border-copper/60 transition-all duration-300 cursor-pointer shadow-modern-card hover:shadow-modern-hover flex flex-col">
+                          className="group bg-cardBg hover:bg-cardHover rounded-3xl p-5 border border-borderHighlight/50 hover:border-copper/60 transition-all duration-300 cursor-pointer shadow-modern-card hover:shadow-modern-hover flex flex-col">
 
                           {/* ====日期 + 團務狀態==== */}
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
                               {/* 日期方塊 */}
-                              <div className="shrink-0 w-14 h-14 rounded-2xl bg-void border border-borderHighlight flex flex-col items-center justify-center">
-                                <span className="text-[9px] font-bold tracking-widest text-copper">
+                              <div className="shrink-0 w-16 h-16 rounded-2xl bg-void border border-borderHighlight/70 flex flex-col items-center justify-center">
+                                <span className="text-[11px] font-bold text-copper">
                                   {monthLabel}
                                 </span>
                                 <span className="text-xl leading-none font-bold text-parchment mt-0.5">
@@ -2392,51 +2392,51 @@
 
                               {/* 星期與時間 */}
                               <div>
-                                <div className="text-xs text-mutedText">
+                                <div className="text-sm text-mutedText">
                                   {weekdayLabel}
                                 </div>
-                                <div className="text-sm font-bold text-parchment mt-0.5">
+                                <div className="text-s font-bold text-parchment mt-0.5">
                                   {timeLabel}
                                 </div>
                               </div>
                             </div>
 
                             {/* 團務狀態 */}
-                            <span className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full border ${statusMeta.className}`}>
+                            <span className={`shrink-0 text-[13px] font-bold px-2.5 py-1 rounded-full border ${statusMeta.className}`}>
                               {statusMeta.label}
                             </span>
                           </div>
 
                           {/* ====劇本 / 標題==== */}
                           <div className="mt-5">
-                            <div className="text-[11px] text-purple-300 font-semibold tracking-wide">
+                            <div className="text-[13px] text-purple-300 font-semibold tracking-wide">
                               {evt.scenario_name}
                             </div>
-                            <h3 className="text-xl font-bold text-parchment group-hover:text-copper transition mt-1 leading-snug">
+                            <h3 className="text-2xl font-bold text-parchment group-hover:text-copper transition mt-1 leading-snug">
                               {evt.title}
                             </h3>
-                            <p className="text-sm text-mutedText mt-2 line-clamp-2 leading-relaxed min-h-[2.5rem]">
+                            <p className="text-s text-mutedText mt-2 line-clamp-2 leading-relaxed min-h-[2.5rem]">
                               {evt.one_liner}
                             </p>
                           </div>
 
                           {/* ====地點===== */}
-                          <div className="mt-4 bg-void/60 border border-borderDefault rounded-xl px-3 py-2.5 flex items-center gap-2 text-xs">
+                          <div className="mt-4 bg-void/60 border border-borderHighlight/70 rounded-xl px-3 py-2.5 flex items-center gap-2 text-s">
                             <span className="shrink-0">
                               📍
                             </span>
-                            <span className="text-mutedText truncate">
+                            <span className="text-greyText truncate">
                               {evt.location}
                             </span>
                           </div>
 
                           {/* ====小隊席位==== */}
-                          <div className="mt-5 pt-4 border-t border-borderDefault/60">
+                          <div className="mt-5 pt-4 border-t border-borderHighlight/50">
                             <div className="flex justify-between items-center gap-3">
-                              <span className="text-xs text-mutedText">
+                              <span className="text-sm text-mutedText">
                                 小隊進度
                               </span>
-                              <span className="text-sm font-bold text-copper">
+                              <span className="text-s font-bold text-copper">
                                 {booked}
                                 {' / '}
                                 {maxPlayers}
@@ -2444,7 +2444,7 @@
                             </div>
 
                             {/* 人數進度條 */}
-                            <div className="w-full bg-stone-900 h-2 rounded-full overflow-hidden mt-2">
+                            <div className="w-full bg-stone-900 h-3 rounded-full overflow-hidden mt-2 border border-borderHighlight/40">
                               <div
                                 className={` h-full transition-all duration-500
                                   ${isFull ? 'bg-crimson' : 'bg-gradient-to-r from-mystic to-copper'}`}
@@ -2455,11 +2455,11 @@
                             {/* 成團進度 */}
                             <div className="mt-2">
                               {isFormed ? (
-                                <span className="text-[11px] text-emerald-400 font-bold">
+                                <span className="text-[13px] text-emerald-400 font-bold">
                                   ✓ 已達最低成團人數
                                 </span>
                               ) : (
-                                <span className="text-[11px] text-mutedText">
+                                <span className="text-[13px] text-mutedText">
                                   尚差{' '}
                                   <strong className="text-copper">
                                     {Math.max(0, minPlayers - booked)}
@@ -2472,7 +2472,7 @@
 
                           {/* ====個人狀態 + Keeper==== */}
                           <div className="mt-autopt-4 flex items-center justify-between gap-3">
-                            <div className="text-xs min-w-0">
+                            <div className="text-sm min-w-0">
                               {joinState.key === 'confirmed' ? (
                                 <span className="text-emerald-400 font-bold">
                                   ✓ 已加入本場
@@ -2495,7 +2495,7 @@
                                 </span>
                               )}
                             </div>
-                            <span className="text-[10px] text-mutedText truncate text-right max-w-[42%]">
+                            <span className="text-[12px] text-mutedText truncate text-right max-w-[42%]">
                               Keeper・{evt.keeper_name}
                             </span>
                           </div>
@@ -2509,51 +2509,48 @@
 
             {currentTab === 'archive' && (
               <div className="space-y-10">
-                <div className="bg-cardBg rounded-3xl p-8 border border-borderHighlight/40 shadow-modern-card space-y-4">
+                <div className="bg-cardBg rounded-3xl p-8 border border-borderHighlight/50 shadow-modern-card space-y-4">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">🕯</span>
-                    <h2 className="text-2xl font-gothic font-bold text-parchment">關於密斯卡託尼克探險社</h2>
+                    <h2 className="text-2xl font-gothic font-bold text-parchment">關於TRPG預約系統</h2>
                   </div>
                   <p className="text-base text-mutedText leading-relaxed">
-                    我們是專注於《克蘇魯的呼喚》(Call of Cthulhu 7th) 的線下與線上跑團聚會。無論是初次涉足神秘領域的新手，或是渴望直視不可名狀恐懼的老練調查員，我們每週皆由資深守密人（Keeper）帶領，提供沉浸且節奏嚴謹的冒險體驗。
+                    我們是專注於《克蘇魯的呼喚》(Call of Cthulhu 7th) 的線下與線上跑團聚會。無論是初次涉足神秘領域的新手，或是渴望直視不可名狀恐懼的老練調查員，我們會不定時由資深守密人（Keeper）帶領，提供友善且沉浸的冒險體驗。
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-borderDefault/50 text-sm">
-                    <div className="bg-black/40 p-4 rounded-2xl border border-borderDefault">
+                  <div className="gap-4 text-sm flex flex-wrap items-center">
+                    <div className="bg-black/40 py-2 px-4 rounded-2xl border border-borderHighlight/50">
                       <strong className="text-copper block text-base mb-1">精緻小團</strong>
-                      <span className="text-mutedText">每團僅 2-4 人，確保每位調查員皆有充裕的發揮與推理解謎時間。</span>
                     </div>
-                    <div className="bg-black/40 p-4 rounded-2xl border border-borderDefault">
+                    <div className="bg-black/40 py-2 px-4 rounded-2xl border border-borderHighlight/50">
                       <strong className="text-copper block text-base mb-1">誠信履約</strong>
-                      <span className="text-mutedText">開團前 36 小時鎖定名單，防止臨時放鳥確保全體玩家遊戲品質。</span>
                     </div>
-                    <div className="bg-black/40 p-4 rounded-2xl border border-borderDefault">
-                      <strong className="text-copper block text-base mb-1">歷程繼承</strong>
-                      <span className="text-mutedText">完團後由 Keeper 發放角色成長紀錄，永久保存每次調查留下的變化與歷程。</span>
+                    <div className="bg-black/40 py-2 px-4 rounded-2xl border border-borderHighlight/50">
+                      <strong className="text-copper block text-base mb-1">角色成長繼承</strong>
                     </div>
                   </div>
                 </div>
 
                 {/* 花絮圖片牆 */}
                 <div className="space-y-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-borderHighlight/40 pb-3">
+                  <div className="flex s:flex-row s:items-center justify-between gap-3 border-b border-borderHighlight/40 pb-3">
                     <div>
                       <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
                         <span>📷</span>
                         調查花絮
                       </h3>
-                      <p className="text-xs text-mutedText mt-1">
-                        記錄那些值得留存在密斯卡託尼克檔案館中的片段。
+                      <p className="text-sm text-mutedText mt-1">
+                        記錄那些值得留存在跑團秘辛。
                       </p>
                     </div>
                     {accountRole === 'admin' && (
-                      <button onClick={handleOpenNewGallery} className="px-4 py-2 bg-copper hover:bg-copperDark text-black rounded-xl text-sm font-bold transition">
+                      <button onClick={handleOpenNewGallery} className="px-4 py-1 bg-copper hover:bg-copperDark text-black rounded-xl text-s font-bold transition">
                         ＋ 新增花絮
                       </button>
                     )}
                   </div>
 
                   {galleryLoading ? (
-                    <div className="py-12 text-center text-sm text-mutedText">
+                    <div className="py-12 text-center text-s text-mutedText">
                       正在翻閱絕密影像檔案...
                     </div>
                   ) : galleryItems.length === 0 ? (
@@ -2561,16 +2558,16 @@
                       <div className="text-4xl">
                         🕯️
                       </div>
-                      <div className="text-sm font-bold text-parchment mt-3">
+                      <div className="text-s font-bold text-parchment mt-3">
                         尚無公開花絮
                       </div>
-                      <div className="text-xs text-mutedText mt-2">
+                      <div className="text-sm text-greyText mt-2">
                         Keeper 發布的調查影像將保存在這裡。
                       </div>
                     </div>
                   ) : (
                     <div className="max-h-[980px] md:max-h-[850px] overflow-y-auto custom-scrollbar pr-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      <div className="grid grid-cols-1 s:grid-cols-2 lg:grid-cols-3 gap-5">
                         {galleryItems.map((item, index) => (
                             <div key={item.id} onClick={() => openGalleryLightbox(index)}
                               className="group bg-cardBg border border-borderHighlight/40 rounded-2xl overflow-hidden cursor-pointer hover:border-copper/50 transition shadow-modern-card">
@@ -2585,11 +2582,11 @@
                                 {accountRole === 'admin' && (
                                   <div className="absolute top-3 right-3 flex gap-2">
                                     <button type="button" onClick={e => {e.stopPropagation(); handleOpenEditGallery(item);}}
-                                      className="px-2.5 py-1.5 rounded-lg bg-black/80 text-copper text-xs border border-copper/40 hover:bg-black">
+                                      className="px-2.5 py-1.5 rounded-lg bg-black/80 text-copper text-s border border-copper/40 hover:bg-copperDark/50 transition">
                                       ✏️
                                     </button>
                                     <button type="button" onClick={e => {e.stopPropagation();handleDeleteGallery(item);}}
-                                      className="px-2.5 py-1.5 rounded-lg bg-red-950/90 text-red-300 text-xs border border-red-800 hover:bg-red-900">
+                                      className="px-3 py-1.5 rounded-lg bg-red-950/90 text-red-300 text-s border border-red-800 hover:bg-red-900 transition">
                                       🗑
                                     </button>
                                   </div>
@@ -2597,7 +2594,7 @@
                               </div>
 
                               <div className="p-4">
-                                <p className="text-sm text-mutedText leading-relaxed line-clamp-2">
+                                <p className="text-s text-mutedText leading-relaxed line-clamp-2">
                                   {item.caption}
                                 </p>
                               </div>
@@ -2615,23 +2612,25 @@
               <div className="space-y-8">
                 
                 {/* 頂部身分切換與帳號名片 */}
-                <div className="bg-cardBg rounded-3xl p-6 sm:p-8 border border-borderHighlight/40 shadow-modern-card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                <div className="bg-cardBg rounded-3xl p-6 s:p-8 border border-borderHighlight/50 shadow-modern-card flex flex-col s:flex-row justify-between items-start s:items-center gap-6">
                   <div className="flex items-start gap-4">
                     <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-copper to-amber-800 flex items-center justify-center text-3xl shadow-glow-purple">
                       🕵️‍♂️
                     </div>
                     <div>
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-3 items-center">
                         <h2 className="text-2xl font-bold text-parchment">
                           {currentUser ? (profile?.display_name || currentUser.user_metadata?.full_name || currentUser.email) : '尚未登入'}
                         </h2>
+                        <p className="text-xs text-mutedText mt-1">
+                          狀態：{currentUser ? `登入帳號: ${currentUser.email}` : '未登入 (可隨時點擊右上角登入)'}
+                        </p>
                       </div>
-                      <p className="text-sm text-copper mt-0.5 font-medium">{accountRole === 'admin' ? 'Keeper 守密人' : 'Miskatonic 認證調查員'}</p>
-                      <p className="text-xs text-mutedText mt-1">
-                        狀態：{currentUser ? `登入帳號: ${currentUser.email}` : '未登入 (可隨時點擊右上角登入)'}
-                      </p>
+
+                      <p className="text-s text-copper mt-0.5 font-medium">{accountRole === 'admin' ? 'Keeper 守密人' : 'Miskatonic 認證調查員'}</p>
+                      
                       {currentUser && (
-                        <button onClick={handleOpenProfileEdit} className="mt-3 px-3 py-1.5 bg-void hover:bg-cardHover border border-borderHighlight text-xs text-copper rounded-xl transition">
+                        <button onClick={handleOpenProfileEdit} className="mt-3 px-2.5 py-1.5 bg-void hover:bg-copper/20 border border-copper/40 text-sm text-copper rounded-xl transition">
                           ✏️ 編輯會員資料
                         </button>
                       )}
@@ -2639,10 +2638,10 @@
                   </div>
 
                   {/* 切換視角 (會員 vs 管理員) */}
-                  <div className="flex items-center gap-2 bg-void p-1.5 rounded-2xl border border-borderHighlight/50">
+                  <div className="flex items-center gap-2 bg-void p-1.5 rounded-2xl border border-borderHighlight/70">
                     <button
                       onClick={() => setPortalView('member')}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+                      className={`px-4 py-2 rounded-xl text-s font-medium transition ${
                         portalView === 'member'
                           ? 'bg-mystic text-white font-bold'
                           : 'text-mutedText hover:text-white'
@@ -2654,7 +2653,7 @@
                     {accountRole === 'admin' && (
                       <button
                         onClick={() => setPortalView('admin')}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+                        className={`px-4 py-2 rounded-xl text-s font-medium transition ${
                           portalView === 'admin'
                             ? 'bg-crimson text-white font-bold shadow-glow-purple'
                             : 'text-mutedText hover:text-white'
@@ -2670,79 +2669,79 @@
                 {portalView === 'member' && (
                   <div className="space-y-8">
                     {/* 角色卡管理 */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4">
                       <div className="flex items-center justify-between border-b border-borderHighlight/40 pb-3">
                         <div>
                           <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
                             <span>📋</span> 我的調查員角色卡 ({availableCharacters.length} 張)
                           </h3>
-                          <p className="text-xs text-mutedText mt-1">報名時將預設攜帶「出戰中」的角色，亦可在報名視窗自由選擇。</p>
+                          <p className="text-s text-mutedText mt-1">報名時將預設攜帶「出戰中」的角色，亦可自由選擇。</p>
                         </div>
-                        <button onClick={() => setShowNewCharForm(true)} className="px-4 py-2 bg-mystic hover:bg-purple-600 text-white rounded-xl text-sm font-bold shadow-glow-purple transition">
+                        <button onClick={() => setShowNewCharForm(true)} className="px-4 py-2.5 bg-copper hover:bg-copperDark text-black rounded-xl text-s font-bold transition">
                           + 快速建立新卡
                         </button>
                       </div>
 
                       {/* 建立角色卡表單 */}
                       {showNewCharForm && (
-                        <form onSubmit={handleCreateChar} className="bg-void p-6 rounded-3xl border border-mystic/40 space-y-4">
-                          <h4 className="text-base font-bold text-copper">登錄簡易調查員檔案</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                        <form onSubmit={handleCreateChar} className="bg-cardBg border-borderHighlight/50 p-6 rounded-3xl border-2 space-y-4 border-dashed">
+                          <h4 className="text-lg font-bold text-copper">登錄簡易調查員檔案</h4>
+                          <div className="grid grid-cols-1 s:grid-cols-3 gap-4 text-s">
                             <div>
-                              <label className="block text-xs text-mutedText mb-1">姓名 *</label>
+                              <label className="block text-s text-greyText mb-1">姓名 *</label>
                               <input
                                 required
                                 type="text"
                                 placeholder="例：亨利·摩根"
                                 value={newChar.name}
                                 onChange={e => setNewChar({...newChar, name: e.target.value})}
-                                className="w-full bg-cardBg border border-borderHighlight rounded-xl p-2.5 text-parchment text-sm"
+                                className="w-full bg-cardBg border border-borderHighlight/70 rounded-xl p-2.5 text-parchment text-s"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs text-mutedText mb-1">職業 *</label>
+                              <label className="block text-s text-greyText mb-1">職業 *</label>
                               <input
                                 required
                                 type="text"
                                 placeholder="例：私家偵探 / 戰地記者"
                                 value={newChar.occupation}
                                 onChange={e => setNewChar({...newChar, occupation: e.target.value})}
-                                className="w-full bg-cardBg border border-borderHighlight rounded-xl p-2.5 text-parchment text-sm"
+                                className="w-full bg-cardBg border border-borderHighlight/70 rounded-xl p-2.5 text-parchment text-s"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs text-mutedText mb-1">理智值 (SAN: 1~99)</label>
+                              <label className="block text-s text-greyText mb-1">理智值 (SAN: 1~99)</label>
                               <input
                                 type="number"
                                 min="1"
                                 max="99"
                                 value={newChar.san}
                                 onChange={e => setNewChar({...newChar, san: e.target.value})}
-                                className="w-full bg-cardBg border border-borderHighlight rounded-xl p-2.5 text-parchment text-sm"
+                                className="w-full bg-cardBg border border-borderHighlight/70 rounded-xl p-2.5 text-parchment text-s"
                               />
                             </div>
                           </div>
                           <div>
-                            <label className="block text-xs text-mutedText mb-1">一句話背景或特殊信物</label>
+                            <label className="block text-s text-greyText mb-1">一句話背景或特殊信物</label>
                             <input
                               type="text"
                               placeholder="例：總是隨身攜帶一把斑駁的銀製懷錶，經常做關於大海的噩夢..."
                               value={newChar.feature}
                               onChange={e => setNewChar({...newChar, feature: e.target.value})}
-                              className="w-full bg-cardBg border border-borderHighlight rounded-xl p-2.5 text-parchment text-sm"
+                              className="w-full bg-cardBg border border-borderHighlight/70 rounded-xl p-2.5 text-parchment text-s"
                             />
                           </div>
                           <div className="flex justify-end gap-3 pt-2">
                             <button
                               type="button"
                               onClick={() => setShowNewCharForm(false)}
-                              className="px-4 py-2 text-sm text-mutedText hover:text-white"
+                              className="px-4 py-2 text-s text-mutedText hover:text-white"
                             >
                               取消
                             </button>
                             <button type="submit"
                               disabled={isActionLoading('create-char')}
-                              className={`px-5 py-2 font-bold rounded-xl text-sm transition ${
+                              className={`px-5 py-2 font-bold rounded-xl text-s transition ${
                                 isActionLoading('create-char')
                                   ? 'bg-stone-800 text-stone-500 cursor-wait'
                                   : 'bg-copper hover:bg-copperDark text-black'
@@ -2768,15 +2767,15 @@
                             <div 
                               key={c.id}
                               className={`p-5 rounded-2xl border transition-all ${
-                                c.is_active ? 'bg-cardHover border-copper shadow-glow-purple' : 'bg-cardBg border-borderDefault'
+                                c.is_active ? 'bg-cardHover border-copper shadow-glow-purple' : 'bg-cardBg border-borderHighlight/50'
                               }`}
                             >
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <h4 className="text-lg font-bold text-parchment">{c.name}</h4>
-                                  <span className="text-xs text-copper font-medium">{c.occupation}</span>
+                                  <h4 className="text-xl font-bold text-parchment">{c.name}</h4>
+                                  <span className="text-s text-copper font-medium">{c.occupation}</span>
                                   <div className="mt-1">
-                                    <span className="text-[11px] px-2 py-0.5 rounded-lg bg-purple-950 text-purple-300 border border-purple-800">
+                                    <span className="text-[13px] px-2 py-0.5 rounded-lg bg-purple-950 text-purple-300 border border-purple-800">
                                       {getCharacterTitle(c.san)}
                                     </span>
                                   </div>
@@ -2784,12 +2783,12 @@
                                 <button
                                   disabled={c.is_active || isActionLoading(`active:${c.id}`)}
                                   onClick={() => handleSetActiveCharacter(c.id)}
-                                  className={`text-xs px-3 py-1 rounded-xl font-bold transition ${
+                                  className={`text-sm px-3 py-1 rounded-xl font-bold transition ${
                                     c.is_active
                                       ? 'bg-copper text-black cursor-default'
                                       : isActionLoading(`active:${c.id}`)
                                         ? 'bg-stone-900 text-stone-500 cursor-wait'
-                                        : 'bg-void text-mutedText hover:text-white border border-borderHighlight'
+                                        : 'bg-void text-mutedText hover:text-white border border-borderHighlight/50 hover:border-borderHighlight/70'
                                   }`}
                                 >
                                   {c.is_active ? '✓ 出戰中' : isActionLoading(`active:${c.id}`)
@@ -2801,41 +2800,41 @@
 
                               {/* SAN 條 */}
                               <div className="mt-3 space-y-1.5">
-                                <div className="flex justify-between text-xs font-semibold">
+                                <div className="flex justify-between text-sm font-semibold">
                                   <span className="text-mutedText">理智值 (SAN)</span>
                                   <span className={c.san < 40 ? 'text-red-400 animate-pulse font-bold' : 'text-emerald-400'}>
-                                    {c.san} / {c.max_san} {c.san < 40 && '【瀕臨瘋狂】'}
+                                    {c.san} / {c.max_san} {c.san < 35 && '【瀕臨瘋狂】'}
                                   </span>
                                 </div>
-                                <div className="w-full bg-stone-900 h-2 rounded-full overflow-hidden">
+                                <div className="w-full bg-stone-900 h-2.5 rounded-full overflow-hidden">
                                   <div
-                                    className={`h-full ${c.san < 40 ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                    className={`h-full ${c.san < 35 ? 'bg-red-500' : 'bg-emerald-500'}`}
                                     style={{ width: `${(c.san / c.max_san) * 100}%` }}
                                   ></div>
                                 </div>
                               </div>
 
-                              <p className="text-xs text-mutedText mt-3 bg-void/60 p-3 rounded-xl border border-borderDefault/60 leading-relaxed">
+                              <p className="text-sm text-mutedText mt-3 bg-void/60 p-3 rounded-xl border border-borderHighlight/50 leading-relaxed">
                                 {c.feature}
                               </p>
 
-                              <div className="mt-4 pt-3 border-t border-borderDefault flex items-center justify-end gap-2">
-                                <button onClick={() => setGrowthRecordCharacter(c) } className="px-3 py-1.5 bg-purple-950 hover:bg-purple-900 border border-purple-700 text-purple-300 rounded-xl text-xs font-bold transition">
+                              <div className="mt-4 pt-3 border-t border-borderHighlight/30 flex items-center justify-end gap-2">
+                                <button onClick={() => setGrowthRecordCharacter(c) } className="px-3 py-1.5 bg-purple-950 hover:bg-purple-900 border border-purple-700 text-purple-300 rounded-xl text-s font-bold transition">
                                   📜 成長紀錄
                                   {charGrowthRecords.length > 0 && ` (${charGrowthRecords.length})`}
                                 </button>
 
-                                <button onClick={() => handleOpenEditCharacter(c)} className="px-3 py-1.5 bg-copper/10 hover:bg-copper/20 border border-copper/40 text-copper rounded-xl text-xs font-bold transition">
+                                <button onClick={() => handleOpenEditCharacter(c)} className="px-3 py-1.5 bg-copper/10 hover:bg-copper/20 border border-copper/40 text-copper rounded-xl text-s font-bold transition">
                                   ✏️ 編輯角色
                                 </button>
 
                                 <button type="button"
                                   disabled={isActionLoading(`archive-char:${c.id}`)}
                                   onClick={() => handleArchiveCharacter(c)}
-                                  className={`px-3 py-1.5 border rounded-xl text-xs font-bold transition ${
+                                  className={`px-3 py-1.5 border rounded-xl text-s font-bold transition ${
                                     isActionLoading(`archive-char:${c.id}`)
-                                      ? 'bg-stone-900 border-stone-800 text-stone-600 cursor-wait'
-                                      : 'bg-stone-950 hover:bg-stone-900 border-stone-800 text-stone-400 hover:text-parchment'
+                                      ? 'bg-stone-900 border-stone-700 text-stone-600 cursor-wait'
+                                      : 'bg-stone-950 hover:bg-stone-900 border-stone-700 text-stone-400 hover:text-parchment'
                                   }`}
                                 >
                                   {isActionLoading(`archive-char:${c.id}`)
@@ -2851,23 +2850,23 @@
                       </div>
 
                       {archivedCharacters.length > 0 && (
-                        <div className="mt-5 border border-borderDefault rounded-2xl overflow-hidden bg-void/30">
+                        <div className="mt-5 border border-borderHighlight/70 rounded-2xl overflow-hidden bg-void/30">
                           <button
                             type="button"
                             onClick={() => setShowArchivedCharacters(current => !current)}
                             className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-cardHover transition"
                           >
                             <div>
-                              <div className="text-sm font-bold text-mutedText">
+                              <div className="text-s font-bold text-mutedText">
                                 🗃 已封存調查員
                               </div>
-                              <div className="text-[11px] text-stone-600 mt-0.5">
+                              <div className="text-[13px] text-mutedText mt-1">
                                 保留過往團務與成長紀錄
                               </div>
                             </div>
 
                             <div className="flex items-center gap-3">
-                              <span className="text-xs text-mutedText">
+                              <span className="text-s text-greyText">
                                 {archivedCharacters.length} 張
                               </span>
                               <span className="text-xs text-copper">
@@ -2880,46 +2879,46 @@
                           </button>
 
                           {showArchivedCharacters && (
-                            <div className="p-4 border-t border-borderDefault grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="p-4 border-t border-borderHighlight/70 grid grid-cols-1 md:grid-cols-2 gap-3">
                               {archivedCharacters.map(
                                 character => {
                                   const charGrowthRecords = growthRecords.filter(record => record.character_id === character.id);
 
                                   return (
 
-                                    <div key={character.id} className="bg-stone-950/60 border border-stone-800 rounded-2xl p-4 opacity-80">
+                                    <div key={character.id} className="bg-stone-950/60 border border-borderHighlight/70 rounded-2xl p-4 opacity-80">
                                       <div className="flex items-start justify-between gap-3">
                                         <div>
-                                          <div className="font-bold text-parchment">
+                                          <div className="font-bold text-greyText">
                                             {character.name}
                                           </div>
-                                          <div className="text-xs text-mutedText mt-0.5">
+                                          <div className="text-sm text-greyText mt-0.5">
                                             {character.occupation}
                                           </div>
                                         </div>
-                                        <span className="text-[10px] px-2 py-1 rounded-lg bg-stone-900 border border-stone-700 text-stone-400">
+                                        <span className="text-[12px] px-2 py-1 rounded-lg bg-stone-900 border border-borderHighlight/70 text-parchment">
                                           已封存
                                         </span>
                                       </div>
-                                      <div className="mt-3 text-xs text-mutedText">
+                                      <div className="mt-3 text-sm text-greyText">
                                         SAN{' '}
-                                        <span className="text-parchment">
+                                        <span className="text-greyText">
                                           {character.san}
                                           {' / '}
                                           {character.max_san}
                                         </span>
                                       </div>
-                                      <div className="mt-4 pt-3 border-t border-stone-800 flex justify-end gap-2">
-                                        <button type="button" onClick={() => setGrowthRecordCharacter(character)} className="px-3 py-1.5 bg-purple-950/50 border border-borderHighlight text-purple-300 rounded-xl text-xs font-bold">
+                                      <div className="mt-4 pt-3 border-t border-borderHighlight/70 flex justify-end gap-2">
+                                        <button type="button" onClick={() => setGrowthRecordCharacter(character)} className="px-3 py-1.5 bg-purple-950/50 hover:bg-purple-950 border border-borderHighlight text-purple-300 rounded-xl text-sm font-bold">
                                           📜 成長紀錄
                                           {charGrowthRecords.length > 0 && ` (${charGrowthRecords.length})`}
                                         </button>
                                         <button type="button" disabled={ isActionLoading(`restore-char:${character.id}`)}
                                           onClick={() => handleRestoreCharacter(character)}
-                                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                                          className={`px-3 py-1.5 rounded-xl text-sm font-bold border transition ${
                                             isActionLoading(`restore-char:${character.id}`)
-                                              ? 'bg-stone-900 border-stone-800 text-stone-600 cursor-wait'
-                                              : 'bg-copper/10 hover:bg-copper/20 border-copper/40 text-copper'
+                                              ? 'bg-stone-900 border-borderHighlight/70 text-mutedText cursor-wait'
+                                              : 'bg-copper/10 hover:bg-copper/30 border-copper/50 text-copper'
                                           }`}
                                         >
                                           {isActionLoading(`restore-char:${character.id}`)
@@ -2939,21 +2938,21 @@
                     </div>
 
                     {/* 我的預約與出團記錄 */}
-                    <div className="space-y-4">
-                      <div className="border-b border-borderHighlight/40 pb-3">
+                    <div className="space-y-4 pt-4">
+                      <div className="border-b border-borderHighlight/50 pb-3">
                         <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
                           <span>⛺</span>
                           我的預約與出團記錄
                         </h3>
-                        <p className="text-xs text-mutedText mt-1">
+                        <p className="text-s text-mutedText mt-1">
                           管理目前參加中的團務，以及查看過往調查紀錄。
                         </p>
                       </div>
 
                       {/* Member 紀錄 Tabs */}
-                      <div className="flex items-center gap-2 bg-void p-1.5 rounded-2xl border border-borderDefault w-fit">
+                      <div className="flex items-center gap-2 bg-void p-1.5 rounded-2xl border border-borderHighlight/70 w-fit">
                         <button type="button" onClick={() => setMemberEventTab('current')}
-                          className={`px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
+                          className={`px-4 py-2 rounded-xl text-s font-bold transition flex items-center gap-2 ${
                             memberEventTab === 'current'
                               ? 'bg-mystic text-white'
                               : 'text-mutedText hover:text-white'
@@ -2971,7 +2970,7 @@
                             // 每次重新進歷史 先回到前 10 筆
                             setMemberHistoryLimit(10);
                           }}
-                          className={`px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
+                          className={`px-4 py-2 rounded-xl text-s font-bold transition flex items-center gap-2 ${
                             memberEventTab === 'history'
                               ? 'bg-copper/20 text-copper border border-copper/40'
                               : 'text-mutedText hover:text-copper'
@@ -2980,7 +2979,7 @@
                           <span>
                             歷史紀錄
                           </span>
-                          <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-black/30 flex items-center justify-center text-[11px]">
+                          <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-copper/20 flex items-center justify-center text-[11px]">
                             {historyMemberEvents.length}
                           </span>
                         </button>
@@ -2992,10 +2991,10 @@
                             <div className="text-3xl mb-3">
                               {memberEventTab === 'history' ? '📜' : '🕯️'}
                             </div>
-                            <div className="text-sm font-bold text-parchment">
+                            <div className="text-s font-bold text-parchment">
                               {memberEventTab === 'history' ? '目前尚無歷史紀錄' : '目前沒有進行中的預約'}
                             </div>
-                            <div className="text-xs text-mutedText mt-2">
+                            <div className="text-sm text-greyText mt-2">
                               {memberEventTab === 'history' ? '完成、取消、退出或被移出的團務會保存在這裡。' : '歡迎前往「跑團大廳」尋找下一場調查任務。'}
                             </div>
                           </div>
@@ -3004,20 +3003,20 @@
                             const myBooking = getMyBookingRecord(e);
                             const statusMeta = getBookingStatusMeta(e,myBooking);
                             return (
-                              <div key={e.id} className="bg-cardBg p-5 rounded-2xl border border-borderHighlight/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                              <div key={e.id} className="bg-cardBg p-5 rounded-2xl border border-borderHighlight/50 flex flex-col s:flex-row justify-between items-start s:items-center gap-4">
                                 <div>
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-xs text-copper bg-copper/10 px-2.5 py-0.5 rounded-md border border-copper/30 font-medium">
+                                    <span className="text-sm text-copper bg-copper/20 px-2.5 py-0.5 rounded-md border border-copper/30 font-medium">
                                       {e.scenario_name}
                                     </span>
-                                    <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${statusMeta.className}`}>
+                                    <span className={`text-[12px] px-2.5 py-0.5 rounded-full font-bold ${statusMeta.className}`}>
                                       {statusMeta.label}
                                     </span>
                                   </div>
                                   <h4 className="text-lg font-bold text-parchment mt-2">
                                     {e.title}
                                   </h4>
-                                  <p className="text-xs text-mutedText mt-1">
+                                  <p className="text-sm text-mutedText mt-1">
                                     📅{' '}
                                     {new Date( e.event_date).toLocaleString('zh-TW')}
                                     {' | '}
@@ -3025,7 +3024,7 @@
                                   </p>
 
                                   {myBooking?.charName && (
-                                    <p className="text-xs text-mutedText mt-1">
+                                    <p className="text-sm text-mutedText mt-1">
                                       🎭 角色：
                                       <span className="text-copper">
                                         {myBooking.charName}
@@ -3036,7 +3035,7 @@
                                 </div>
 
                                 {memberEventTab === 'current' && myBooking?.status === 'confirmed' && (
-                                  <button onClick={() => {setActiveEvent(e); setLockAlertMessage(null);}} className="px-4 py-2 bg-void hover:bg-cardHover border border-purple-800 text-sm font-medium text-parchment rounded-xl transition">
+                                  <button onClick={() => {setActiveEvent(e); setLockAlertMessage(null);}} className="px-4 py-2 bg-stone-950 hover:bg-stone-900 border border-borderHighlight/70 hover:border-borderHighlight text-stone-400 hover:text-parchment text-sm font-medium rounded-xl transition">
                                     查看小隊名冊
                                   </button>
                                 )}
@@ -3047,14 +3046,14 @@
                         )}
 
                         {memberEventTab === 'history' && memberHistoryLimit < historyMemberEvents.length && (
-                          <div className="pt-2 text-center">
+                          <div className="pt-2 text-center text-greyText hover:text-copper">
                             <button type="button" onClick={() => setMemberHistoryLimit(current => current + 10)}
-                              className="px-5 py-2.5 bg-void hover:bg-cardHover border border-borderHighlight text-sm text-copper rounded-xl transition"
+                              className="px-4 py-1 text-sm rounded-xl transition"
                             >
                               顯示更多紀錄
-                              <span className="text-mutedText ml-2 text-xs">
+                              <span className="ml-1 text-sm">
                                 ({Math.min(memberHistoryLimit, historyMemberEvents.length)}
-                                {' / '}
+                                {'/'}
                                 {historyMemberEvents.length})
                               </span>
                             </button>
@@ -3068,16 +3067,16 @@
 
                 {/* 視角 B: Keeper 管理員專區 */}
                 {accountRole === 'admin' && portalView === 'admin' && (
-                  <div className="space-y-6">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-borderHighlight/40 pb-3">
+                  <div className="space-y-6 pt-4">
+                    <div className="flex s:flex-row justify-between items-start s:items-center gap-4 border-b border-borderHighlight/40 pb-3 items-center">
                       <div>
                         <h3 className="text-xl font-bold text-parchment flex items-center gap-2">
                           <span className="text-crimson">⚡</span> Keeper 團務管理台
                         </h3>
-                        <p className="text-xs text-mutedText mt-1">檢視報名者資料、管理調查小隊並完成角色成長結算。</p>
+                        <p className="text-s text-mutedText mt-1">檢視報名者資料、管理調查小隊並完成角色成長結算。</p>
                       </div>
 
-                      <button onClick={() => setShowNewEventModal(true)} className="px-4 py-2 bg-crimson hover:bg-crimsonDark text-white rounded-xl text-sm font-bold shadow-glow-purple transition">
+                      <button onClick={() => setShowNewEventModal(true)} className="px-4 py-2.5 bg-crimson hover:bg-crimsonDark text-white rounded-xl text-s font-bold shadow-glow-purple transition">
                         + 發布新團務場次
                       </button>
                     </div>
@@ -3089,7 +3088,7 @@
                             const isActive = adminEventTab === section.key;
                             return (
                               <button key={section.key} type="button" onClick={() => setAdminEventTab(section.key)}
-                                className={`px-4 py-2.5 rounded-xl border text-sm font-bold transition flex items-center gap-2
+                                className={`px-4 py-2.5 rounded-xl border text-s font-bold transition flex items-center gap-1
                                   ${
                                     isActive
                                       ? section.key ===
@@ -3102,7 +3101,7 @@
                                             'cancelled'
                                             ? 'bg-red-950/60 border-red-800 text-red-300'
                                             : 'bg-mysticDark/60 border-mystic text-purple-200'
-                                      : 'bg-void border-borderDefault text-mutedText hover:text-parchment hover:border-purple-800'
+                                      : 'bg-void border-borderDefault text-mutedText hover:text-parchment hover:border-borderDefault'
                                   }
                                 `}
                               >
@@ -3112,8 +3111,8 @@
                                   className={`min-w-[22px] h-[22px] px-1.5 rounded-full flex items-center justify-center text-[11px]
                                     ${
                                       isActive
-                                        ? 'bg-black/30'
-                                        : 'bg-stone-900'
+                                        ? 'bg-borderDefault/50'
+                                        : 'bg-borderDefault/40'
                                     }
                                   `}
                                 >
@@ -3151,7 +3150,7 @@
                               <div className="text-3xl mb-3">
                                 {activeAdminEventSection.icon}
                               </div>
-                              <div className="text-sm font-bold text-parchment">
+                              <div className="text-s font-bold text-parchment">
                                 此分類目前沒有團務
                               </div>
                               <div className="text-xs text-mutedText mt-2">
@@ -3165,7 +3164,7 @@
 
                                   return (
                                     <div key={evt.id} className="bg-cardBg rounded-3xl p-6 border border-borderHighlight/40 space-y-4">
-                                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-borderDefault">
+                                      <div className="flex flex-col s:flex-row justify-between items-start s:items-center gap-2 pb-3 border-b border-borderDefault">
                                         <div>
                                           <div className="flex items-center gap-2 flex-wrap">
                                             <h4 className="text-lg font-bold text-parchment">
@@ -3279,7 +3278,7 @@
                                                     <button type="button" onClick={() => toggleParticipantDetails(evt.id,inv.userId)} className="w-full p-3.5 flex items-center justify-between gap-4 text-left">
                                                       <div className="min-w-0">
                                                         <div className="flex items-center gap-2 flex-wrap">
-                                                          <span className="text-sm font-bold text-parchment">
+                                                          <span className="text-s font-bold text-parchment">
                                                             {inv.charName}
                                                           </span>
                                                           <span className="text-[11px] text-copper">
@@ -3297,11 +3296,11 @@
                                                         </div>
                                                       </div>
 
-                                                      <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center border text-xs transition
+                                                      <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs transition
                                                         ${
                                                           isExpanded
-                                                            ? 'bg-copper/10 border-copper/40 text-copper'
-                                                            : 'bg-black/30 border-borderDefault text-mutedText'
+                                                            ? 'text-copper'
+                                                            : 'text-mutedText'
                                                         }
                                                       `}
                                                       >
@@ -3313,7 +3312,7 @@
                                                     {isExpanded && (
                                                       <div className="px-4 pb-4">
                                                         <div className="border-t border-borderDefault pt-4 space-y-4">
-                                                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                                          <div className="grid grid-cols-1 s:grid-cols-3 gap-3">
 
                                                             {/* Email */}
                                                             <div className="bg-void rounded-xl p-3 border border-borderDefault">
@@ -3403,37 +3402,38 @@
 
           {activeEvent && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-              <div className="bg-cardBg border border-copper/50 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+              <div className="bg-cardBg border border-borderHighlight/50 rounded-3xl max-w-2xl w-full p-6 s:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
                 
-                <div className="flex justify-between items-start border-b border-borderDefault pb-4">
+                <div className="flex justify-between items-start border-b border-borderHighlight/30 pb-4">
                   <div>
-                    <span className="text-xs font-semibold px-3 py-1 rounded-full bg-purple-950 text-purple-300 border border-purple-700/50">
+                    <span className="text-sm font-semibold px-3 py-1 rounded-full bg-purple-950 text-purple-300 border border-purple-700/50">
                       {activeEvent.scenario_name}
                     </span>
                     <h3 className="text-2xl font-bold text-parchment mt-2">{activeEvent.title}</h3>
                   </div>
                   <button 
                     onClick={() => setActiveEvent(null)}
-                    className="w-8 h-8 rounded-full bg-void flex items-center justify-center text-mutedText hover:text-white transition"
+                    className="w-10 h-10 rounded-full border border-borderHighlight/70 bg-void flex items-center justify-center text-greyText hover:text-white hover:border-borderHighlight transition"
                   >
                     ✕
                   </button>
                 </div>
 
                 {/* 簡要資訊 */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-void p-4 rounded-2xl border border-borderDefault">
+                <div className="grid grid-cols-1 s:grid-cols-2 gap-4 bg-void p-4 rounded-2xl border border-borderHighlight/50">
                   <div className="space-y-1.5">
-                    <div className="text-mutedText">📅 開團時間：</div>
-                    <div className="font-semibold text-parchment">
+                    <div className="text-greyText text-sm">📅 開團時間：</div>
+                    <div className="font-semibold text-parchment text-s">
                       {new Date(activeEvent.event_date).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' })}
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <div className="text-mutedText">📍 集合地點：</div>
-                    <div className="font-semibold text-parchment">{activeEvent.location}</div>
+                    <div className="text-greyText text-sm">📍 集合地點：</div>
+                    <div className="font-semibold text-parchment text-s">{activeEvent.location}</div>
                   </div>
-                  <div className="sm:col-span-2 pt-2 border-t border-borderDefault/60 text-mutedText text-xs leading-relaxed">
-                    💡 簡介導讀：{activeEvent.one_liner}
+                  <div className="space-y-1.5">
+                    <div className="text-greyText text-sm">💡 簡介導讀：</div>
+                    <div className="font-semibold text-parchment text-s">{activeEvent.one_liner}</div>
                   </div>
                 </div>
 
@@ -3441,23 +3441,23 @@
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <h4 className="text-base font-bold text-copper flex items-center gap-2">
-                      <span>👥</span> 調查小隊成員名冊 ({activeEvent.booked_investigators.length} / {activeEvent.max_players})
+                      調查小隊成員名冊 ({activeEvent.booked_investigators.length} / {activeEvent.max_players})
                     </h4>
-                    <span className="text-xs text-mutedText">
+                    <span className="text-sm text-mutedText">
                       {activeEvent.booked_investigators.length >= activeEvent.min_players ? '✓ 已達最低成團人數' : `尚需 ${activeEvent.min_players - activeEvent.booked_investigators.length} 人成團`}
                     </span>
                   </div>
 
                   {activeEvent.booked_investigators.length === 0 ? (
-                    <div className="p-4 rounded-2xl bg-void/50 border border-dashed border-borderDefault text-center text-sm text-mutedText">
-                      小隊目前尚無成員，成為第一位踏入迷霧的調查員吧！
+                    <div className="p-4 rounded-2xl bg-void/50 border border-dashed border-borderDefault text-center text-s text-mutedText">
+                      小隊目前尚無成員，成為第一位踏入的調查員吧！
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 s:grid-cols-2 gap-3">
                       {activeEvent.booked_investigators.map((inv, idx) => (
-                        <div key={idx} className="p-3.5 rounded-2xl bg-void border border-borderHighlight/60 flex items-center justify-between text-xs">
+                        <div key={idx} className="p-3.5 rounded-2xl bg-void border border-borderHighlight/50 flex items-center justify-between text-s">
                           <div>
-                            <span className="font-bold text-parchment text-sm block">{inv.charName}</span>
+                            <span className="font-bold text-parchment text-s block">{inv.charName}</span>
                             <span className="text-mutedText">{inv.occupation}</span>
                           </div>
                           <span className="text-emerald-400 font-mono font-bold bg-emerald-950/80 px-2 py-1 rounded-lg border border-emerald-800">
@@ -3472,10 +3472,10 @@
                 {/* 目前會員的報名狀態 */}
                 {currentUser && activeEventJoinState && (
                   <div className={`rounded-2xl border px-4 py-3 ${activeEventJoinState.className}`}>
-                    <div className="text-sm font-bold">
+                    <div className="text-s font-bold">
                       {activeEventJoinState.label}
                     </div>
-                    <div className="text-xs opacity-80 mt-1 leading-relaxed">
+                    <div className="text-sm opacity-80 mt-1 leading-relaxed">
                       {activeEventJoinState.message}
                     </div>
                   </div>
@@ -3483,21 +3483,21 @@
 
                 {/* 退團鎖定提示 */}
                 {lockAlertMessage && (
-                  <div className="p-4 bg-red-950/60 border border-red-600 rounded-2xl text-xs text-red-200 leading-relaxed animate-pulse">
+                  <div className="p-4 bg-red-950/60 border border-red-600 rounded-2xl text-sm text-red-200 leading-relaxed animate-pulse">
                     ⚠️ {lockAlertMessage}
                   </div>
                 )}
 
                 {/* 報名行動區 */}
-                <div className="pt-4 border-t border-borderDefault space-y-4">
+                <div className="pt-4 border-t border-borderHighlight/30 space-y-4">
                   {/* ====尚未登入==== */}
                   {!currentUser ? (
                     <div className="space-y-3">
-                      <div className="bg-copper/5 border border-copper/30 rounded-2xl p-4 text-xs text-mutedText leading-relaxed">
+                      <div className="bg-copper/5 border border-copper/30 rounded-2xl p-4 text-sm text-mutedText leading-relaxed">
                         登入調查員帳號後，即可選擇角色並加入本場調查。
                       </div>
                       <div className="flex justify-end gap-3">
-                        <button type="button" onClick={() => setActiveEvent(null)} className="px-4 py-2.5 text-sm text-mutedText hover:text-white">
+                        <button type="button" onClick={() => setActiveEvent(null)} className="px-4 py-2.5 text-s text-mutedText hover:text-white">
                           返回
                         </button>
                         <button type="button"
@@ -3505,7 +3505,7 @@
                             setActiveEvent(null);
                             setShowAuthModal(true);
                           }}
-                          className="px-6 py-2.5 bg-copper hover:bg-copperDark text-black rounded-xl text-sm font-bold transition shadow-glow-purple"
+                          className="px-6 py-2.5 bg-copper hover:bg-copperDark text-black rounded-xl text-s font-bold transition shadow-glow-purple"
                         >
                           登入後報名
                         </button>
@@ -3516,18 +3516,18 @@
                   ) : activeEventJoinState?.key === 'confirmed' ? (
                     <div className="space-y-3">
                       <div className="bg-emerald-950/30 p-4 rounded-2xl border border-emerald-900">
-                        <div className="text-sm text-emerald-300 font-semibold">
-                          ✓ 你已簽署契約並加入本場調查小隊
+                        <div className="text-s text-emerald-300 font-semibold">
+                          ✓ 你已加入本場調查小隊
                         </div>
                       </div>
 
                       {/* 團務已開始 */}
                       {activeEventStarted ? (
                         <div className="bg-amber-950/40 border border-amber-800 rounded-2xl p-4">
-                          <div className="text-sm font-bold text-amber-300">
+                          <div className="text-s font-bold text-amber-300">
                             ⏳ 團務已開始
                           </div>
-                          <div className="text-xs text-amber-200/80 mt-1 leading-relaxed">
+                          <div className="text-sm text-amber-200/80 mt-1 leading-relaxed">
                             本場調查已經開始，目前正在等待 Keeper 完成團務結算，無法自行退出。
                           </div>
                         </div>
@@ -3535,15 +3535,15 @@
                       /* 進入退團鎖定期 */
                       ) : activeEventLeaveLocked ? (
                         <div className="bg-red-950/50 border border-red-800 rounded-2xl p-4">
-                          <div className="text-sm font-bold text-red-300">
+                          <div className="text-s font-bold text-red-300">
                             🔒 已進入退團鎖定期
                           </div>
-                          <div className="text-xs text-red-200/80 mt-1 leading-relaxed">
+                          <div className="text-sm text-red-200/80 mt-1 leading-relaxed">
                             本場已進入開團前{' '}
                             {activeEvent.lock_hours || 36}
                             {' '}小時鎖定期，因此無法自行退出。
                           </div>
-                          <div className="text-xs text-red-200 mt-2 font-medium">
+                          <div className="text-sm text-red-200 mt-2 font-medium">
                             如有特殊狀況需要退出，請直接聯絡 Keeper。
                           </div>
                         </div>
@@ -3553,7 +3553,7 @@
                           <button type="button" 
                             disabled={isActionLoading(`leave:${activeEvent.id}`)}
                             onClick={() => handleLeaveEvent(activeEvent)} 
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition border ${
+                            className={`px-4 py-2 rounded-xl text-s font-bold transition border ${
                               isActionLoading(`leave:${activeEvent.id}`)
                                 ? 'bg-stone-900 border-stone-700 text-stone-500 cursor-wait'
                                 : 'bg-red-950 hover:bg-red-900 text-red-300 border-red-700'
@@ -3571,13 +3571,13 @@
                   ) : activeEventJoinState?.canJoin ? (
                     <div className="space-y-4">
                       {/* 選擇角色 */}
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                        <label className="text-sm text-copper font-medium whitespace-nowrap">
+                      <div className="flex flex-col s:flex-row s:items-center gap-3">
+                        <label className="text-s text-copper font-medium whitespace-nowrap">
                           指派調查員角色：
                         </label>
 
                         {availableCharacters.length > 0 ? (
-                          <select value={selectedCharId} onChange={e => setSelectedCharId(e.target.value)} className="w-full bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper">
+                          <select value={selectedCharId} onChange={e => setSelectedCharId(e.target.value)} className="w-full bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-s text-parchment focus:outline-none focus:border-copper">
                             {availableCharacters.map(c => (
                               <option key={c.id} value={c.id}>
                                 {c.name}
@@ -3603,13 +3603,13 @@
                       )}
 
                       <div className="flex justify-end gap-3 pt-2">
-                        <button type="button" onClick={() => setActiveEvent(null)} className="px-4 py-2.5 text-sm text-mutedText hover:text-white">
+                        <button type="button" onClick={() => setActiveEvent(null)} className="px-4 py-2.5 text-s text-mutedText hover:text-white">
                           返回
                         </button>
 
                         <button type="button" disabled={!selectedCharId || availableCharacters.length === 0 || isActionLoading(`join:${activeEvent.id}`)}
                           onClick={() => handleJoinEvent(activeEvent.id)}
-                          className={`px-6 py-2.5 rounded-xl text-sm font-bold transition shadow-glow-purple ${
+                          className={`px-6 py-2.5 rounded-xl text-s font-bold transition shadow-glow-purple ${
                             !selectedCharId ||
                             availableCharacters.length === 0 ||
                             isActionLoading(`join:${activeEvent.id}`)
@@ -3621,7 +3621,7 @@
                             ? '報名處理中...'
                             : activeEventJoinState.key === 'withdrawn'
                               ? '↩ 重新加入調查'
-                              : '簽署契約・一鍵報名'
+                              : '我要報名'
                           }
                         </button>
                       </div>
@@ -3630,7 +3630,7 @@
                   /* ====不允許報名==== */
                   ) : (
                     <div className="space-y-3">
-                      <button type="button" disabled className="w-full py-3 bg-stone-900 border border-stone-700 text-stone-500 rounded-xl text-sm font-bold cursor-not-allowed">
+                      <button type="button" disabled className="w-full py-3 bg-stone-900 border border-stone-700 text-stone-500 rounded-xl text-s font-bold cursor-not-allowed">
                         {activeEventJoinState?.label || '目前無法報名'}
                       </button>
                       <button type="button" onClick={() =>setActiveEvent(null)} className="w-full py-2 text-xs text-mutedText hover:text-white transition">
@@ -3645,7 +3645,7 @@
 
           {showAuthModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-              <div className="bg-cardBg border border-purple-500/50 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl relative">
+              <div className="bg-cardBg border border-purple-500/50 rounded-3xl max-w-md w-full p-6 s:p-8 space-y-6 shadow-2xl relative">
                 
                 <div className="flex justify-between items-center border-b border-borderDefault pb-3">
                   <h3 className="text-xl font-bold font-gothic text-copper">
@@ -3670,7 +3670,7 @@
                   </button>
                 </div>
 
-                <form onSubmit={authMode === 'recovery' ? handleRecoveryPasswordSubmit : handleAuthSubmit} noValidate className="space-y-4 text-sm">
+                <form onSubmit={authMode === 'recovery' ? handleRecoveryPasswordSubmit : handleAuthSubmit} noValidate className="space-y-4 text-s">
                   {authMode === 'recovery' && (
                     <>
                       <div>
@@ -3859,15 +3859,15 @@
               彈窗：新增團務 (Keeper 專用)
              ========================================== */}
            {showNewEventModal && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-              <div className="bg-cardBg w-full max-w-md rounded-3xl p-6 sm:p-8 border border-crimson/40 relative">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-s">
+              <div className="bg-cardBg w-full max-w-md rounded-3xl p-6 s:p-8 border border-crimson/40 relative">
                 <h3 className="text-xl font-bold text-crimson mb-4">發布新團務</h3>
                 <form onSubmit={handleCreateEvent} className="space-y-3">
-                  <input required type="text" placeholder="場次標題" value={newEventData.title} onChange={e=>setNewEventData({...newEventData, title:e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-sm text-white" />
-                  <input required type="text" placeholder="劇本名稱，例如：無名祭祀書" value={newEventData.scenario_name} onChange={e =>setNewEventData({...newEventData, scenario_name: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-sm text-white"/>
-                  <input required type="text" placeholder="集合地點" value={newEventData.location} onChange={e=>setNewEventData({...newEventData, location:e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-sm text-white" />
+                  <input required type="text" placeholder="場次標題" value={newEventData.title} onChange={e=>setNewEventData({...newEventData, title:e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-s text-white" />
+                  <input required type="text" placeholder="劇本名稱，例如：無名祭祀書" value={newEventData.scenario_name} onChange={e =>setNewEventData({...newEventData, scenario_name: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-s text-white"/>
+                  <input required type="text" placeholder="集合地點" value={newEventData.location} onChange={e=>setNewEventData({...newEventData, location:e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-s text-white" />
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 s:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-mutedText mb-1">
                         開團日期 *
@@ -3887,7 +3887,7 @@
                             setTimeout(() => {newEventTimeRef.current ?.focus();}, 0);
                           }
                         }}
-                        className="w-full bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                        className="w-full bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-s text-parchment focus:outline-none focus:border-copper"
                       />
                     </div>
 
@@ -3911,7 +3911,7 @@
 
                         }}
 
-                        className="w-full bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                        className="w-full bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-s text-parchment focus:outline-none focus:border-copper"
                       >
 
                         <option value="">
@@ -3935,22 +3935,22 @@
                     </div>
                   </div>
                   
-                  <input ref={newEventIntroRef} required type="text" placeholder="一句話導讀" value={newEventData.one_liner} onChange={e=>setNewEventData({...newEventData, one_liner:e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-sm text-white" />
+                  <input ref={newEventIntroRef} required type="text" placeholder="一句話導讀" value={newEventData.one_liner} onChange={e=>setNewEventData({...newEventData, one_liner:e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-s text-white" />
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-mutedText mb-1">最低成團人數</label>
-                      <input required type="number" min="1" max="8" value={newEventData.min} onChange={e => setNewEventData({...newEventData,min: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-sm text-white"/>
+                      <input required type="number" min="1" max="8" value={newEventData.min} onChange={e => setNewEventData({...newEventData,min: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-s text-white"/>
                     </div>
                     <div>
                       <label className="block text-xs text-mutedText mb-1">最高人數</label>
-                      <input required type="number" min="1" max="8" value={newEventData.max} onChange={e => setNewEventData({...newEventData,max: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-sm text-white"/>
+                      <input required type="number" min="1" max="8" value={newEventData.max} onChange={e => setNewEventData({...newEventData,max: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-lg p-2 text-s text-white"/>
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
-                    <button type="button" onClick={()=>setShowNewEventModal(false)} className="px-4 py-2 text-sm text-mutedText">取消</button>
+                    <button type="button" onClick={()=>setShowNewEventModal(false)} className="px-4 py-2 text-s text-mutedText">取消</button>
                     <button type="submit"
                       disabled={isActionLoading('create-event')}
-                      className={`px-4 py-2 font-bold text-sm rounded-lg ${
+                      className={`px-4 py-2 font-bold text-s rounded-lg ${
                         isActionLoading('create-event')
                           ? 'bg-stone-800 text-stone-500 cursor-wait'
                           : 'bg-crimson text-white'
@@ -3972,7 +3972,7 @@
             ========================================== */}
           {adminConfirmAction && (
             <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-              <div className="bg-cardBg border border-red-800/60 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl">
+              <div className="bg-cardBg border border-red-800/60 rounded-3xl max-w-md w-full p-6 s:p-8 shadow-2xl">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-xs text-red-400 font-bold tracking-wider">
@@ -4002,7 +4002,7 @@
 
                 {adminConfirmAction.type === 'cancel' ? (
                   <div className="mt-5 bg-amber-950/30 border border-amber-800 rounded-2xl p-4">
-                    <div className="text-sm font-bold text-amber-300">
+                    <div className="text-s font-bold text-amber-300">
                       ⚠ 確定取消這場團務？
                     </div>
                     <div className="text-xs text-amber-100/70 mt-2 leading-relaxed">
@@ -4011,7 +4011,7 @@
                   </div>
                 ) : (
                   <div className="mt-5 bg-red-950/40 border border-red-800 rounded-2xl p-4">
-                    <div className="text-sm font-bold text-red-300">
+                    <div className="text-s font-bold text-red-300">
                       ⚠ 確定永久刪除此團務？
                     </div>
                     <div className="text-xs text-red-200/70 mt-2 leading-relaxed">
@@ -4036,7 +4036,7 @@
                   <button type="button"
                     disabled={adminActionLoading}
                     onClick={handleCloseAdminConfirm}
-                    className="px-4 py-2 text-sm text-mutedText hover:text-white disabled:opacity-50"
+                    className="px-4 py-2 text-s text-mutedText hover:text-white disabled:opacity-50"
                   >
                     返回
                   </button>
@@ -4045,7 +4045,7 @@
                     <button type="button"
                       disabled={adminActionLoading}
                       onClick={() => handleAdminCancelEvent(adminConfirmAction.event)}
-                      className="px-5 py-2.5 bg-amber-800 hover:bg-amber-700 disabled:bg-stone-800 text-white rounded-xl text-sm font-bold transition"
+                      className="px-5 py-2.5 bg-amber-800 hover:bg-amber-700 disabled:bg-stone-800 text-white rounded-xl text-s font-bold transition"
                     >
                       {adminActionLoading ? '處理中...' : '確認取消團務'}
                     </button>
@@ -4053,7 +4053,7 @@
                     <button type="button"
                       disabled={adminActionLoading}
                       onClick={() => handleAdminDeleteEvent(adminConfirmAction.event)}
-                      className={`px-5 py-2.5 rounded-xl text-sm font-bold transition 
+                      className={`px-5 py-2.5 rounded-xl text-s font-bold transition 
                         ${
                           adminActionLoading
                             ? 'bg-stone-900 text-stone-600 cursor-wait'
@@ -4073,8 +4073,8 @@
               彈窗：編輯團務 (Keeper 專用)
             ========================================== */}
           {editingEvent && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-              <div className="bg-cardBg w-full max-w-md rounded-3xl p-6 sm:p-8 border border-mystic/40 relative shadow-2xl">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-s">
+              <div className="bg-cardBg w-full max-w-md rounded-3xl p-6 s:p-8 border border-mystic/40 relative shadow-2xl">
                 <div className="flex items-center justify-between mb-5">
                   <div>
                     <h3 className="text-xl font-bold text-copper">✏️ 編輯團務</h3>
@@ -4085,19 +4085,19 @@
                 <form onSubmit={handleUpdateEvent} className="space-y-4">
                   <div>
                     <label className="block text-xs text-mutedText mb-1">場次標題 *</label>
-                    <input required type="text" value={editEventData.title} onChange={e => setEditEventData({...editEventData,title: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                    <input required type="text" value={editEventData.title} onChange={e => setEditEventData({...editEventData,title: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-s text-white focus:outline-none focus:border-copper"/>
                   </div>
                   <div>
                     <label className="block text-xs text-mutedText mb-1">劇本名稱 *</label>
-                    <input required type="text" value={editEventData.scenario_name} onChange={e => setEditEventData({...editEventData,scenario_name: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                    <input required type="text" value={editEventData.scenario_name} onChange={e => setEditEventData({...editEventData,scenario_name: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-s text-white focus:outline-none focus:border-copper"/>
                   </div>
                   <div>
                     <label className="block text-xs text-mutedText mb-1">集合地點 *</label>
-                    <input required type="text" value={editEventData.location} onChange={e => setEditEventData({...editEventData,location: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"
+                    <input required type="text" value={editEventData.location} onChange={e => setEditEventData({...editEventData,location: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-s text-white focus:outline-none focus:border-copper"
                     />
                   </div>
                   <div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 s:grid-cols-2 gap-3">
                       {/* 編輯：日期 */}
                       <div>
                         <label className="block text-xs text-mutedText mb-1">
@@ -4114,7 +4114,7 @@
                             // 日期選完自動跳到時間
                             if (value) { setTimeout(() => {editEventTimeRef.current ?.focus();}, 0);}
                           }}
-                          className="w-full bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                          className="w-full bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-s text-parchment focus:outline-none focus:border-copper"
                         />
                       </div>
                       {/* 編輯：時間 */}
@@ -4136,7 +4136,7 @@
                               }, 0);
                             }
                           }}
-                          className="w-full bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                          className="w-full bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-s text-parchment focus:outline-none focus:border-copper"
                         >
                           <option value="">
                             選擇時間
@@ -4173,16 +4173,16 @@
                   </div>
                   <div>
                     <label className="block text-xs text-mutedText mb-1">一句話導讀 *</label>
-                    <input ref={editEventIntroRef} required type="text" value={editEventData.one_liner} onChange={e => setEditEventData({...editEventData,one_liner: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                    <input ref={editEventIntroRef} required type="text" value={editEventData.one_liner} onChange={e => setEditEventData({...editEventData,one_liner: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-s text-white focus:outline-none focus:border-copper"/>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-mutedText mb-1">最低成團人數</label>
-                      <input required type="number" min="1" max="8" value={editEventData.min} onChange={e => setEditEventData({...editEventData, min: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                      <input required type="number" min="1" max="8" value={editEventData.min} onChange={e => setEditEventData({...editEventData, min: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-s text-white focus:outline-none focus:border-copper"/>
                     </div>
                     <div>
                       <label className="block text-xs text-mutedText mb-1">最高人數</label>
-                      <input required type="number" min="1" max="8" value={editEventData.max} onChange={e => setEditEventData({...editEventData, max: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-copper"/>
+                      <input required type="number" min="1" max="8" value={editEventData.max} onChange={e => setEditEventData({...editEventData, max: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-s text-white focus:outline-none focus:border-copper"/>
                     </div>
                   </div>
                   <div className="bg-void/60 border border-borderDefault rounded-xl p-3 text-xs text-mutedText">
@@ -4195,10 +4195,10 @@
                     </div>
                   </div>
                   <div className="flex justify-end gap-3 pt-3 border-t border-borderDefault">
-                    <button type="button" onClick={() => setEditingEvent(null)} className="px-4 py-2 text-sm text-mutedText hover:text-white transition">取消</button>
+                    <button type="button" onClick={() => setEditingEvent(null)} className="px-4 py-2 text-s text-mutedText hover:text-white transition">取消</button>
                     <button type="submit" 
                       disabled={isActionLoading(`update-event:${editingEvent.id}`)}
-                      className="px-5 py-2 bg-copper hover:bg-copperDark text-black font-bold text-sm rounded-xl transition"
+                      className="px-5 py-2 bg-copper hover:bg-copperDark text-black font-bold text-s rounded-xl transition"
                     >
                       {isActionLoading(`update-event:${editingEvent.id}`)
                         ? '儲存中...'
@@ -4216,19 +4216,19 @@
             ========================================== */}
           {settlingEvent && (
             <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-              <div className="bg-cardBg border border-emerald-700/50 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-                <div className="flex justify-between items-start pb-4 border-b border-borderDefault">
+              <div className="bg-cardBg border border-borderHighlight/50 rounded-3xl max-w-2xl w-full p-6 s:p-8 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <div className="flex justify-between items-start pb-4 border-b border-borderHighlight/50">
                   <div>
-                    <div className="text-xs text-emerald-400 font-bold">
+                    <div className="text-s text-emerald-400 font-bold">
                       KEEPER SESSION SETTLEMENT
                     </div>
                     <h3 className="text-2xl font-bold text-parchment mt-1">
                       📜 團務結算
                     </h3>
-                    <p className="text-sm text-copper mt-1">
+                    <p className="text-s text-copper mt-1">
                       {settlingEvent.title}
                     </p>
-                    <p className="text-xs text-mutedText mt-1">
+                    <p className="text-s text-mutedText mt-1">
                       {settlingEvent.scenario_name}
                     </p>
                   </div>
@@ -4265,7 +4265,7 @@
                             ] || ''
                           }
                           onChange={e => setGrowthNotes({...growthNotes,[inv.characterId]: e.target.value})}
-                          className="w-full bg-cardBg border border-borderHighlight rounded-xl p-3 text-sm text-parchment resize-y focus:outline-none focus:border-emerald-700"
+                          className="w-full bg-cardBg border border-borderHighlight rounded-xl p-3 text-s text-parchment resize-y focus:outline-none focus:border-emerald-700"
                         />
                       </div>
                     )
@@ -4277,12 +4277,12 @@
                   </div>
 
                   <div className="flex justify-end gap-3 pt-4 border-t border-borderDefault">
-                    <button type="button" onClick={() => {setSettlingEvent(null);setGrowthNotes({});}} className="px-4 py-2 text-sm text-mutedText hover:text-white">
+                    <button type="button" onClick={() => {setSettlingEvent(null);setGrowthNotes({});}} className="px-4 py-2 text-s text-mutedText hover:text-white">
                       取消
                     </button>
                     <button type="submit"
                       disabled={isActionLoading(`settle:${settlingEvent.id}`)}
-                      className={`px-5 py-2.5 rounded-xl font-bold text-sm transition ${
+                      className={`px-5 py-2.5 rounded-xl font-bold text-s transition ${
                         isActionLoading(`settle:${settlingEvent.id}`)
                           ? 'bg-stone-800 text-stone-500 cursor-wait'
                           : 'bg-emerald-800 hover:bg-emerald-700 text-white'
@@ -4304,16 +4304,16 @@
             ========================================== */}
           {addingParticipantEvent && (
             <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-                <div className="flex justify-between items-start pb-4 border-b border-borderDefault">
+              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-2xl w-full p-6 s:p-8 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <div className="flex justify-between items-start pb-4 border-b border-borderHighlight/50">
                   <div>
-                    <div className="text-xs text-copper font-bold">
+                    <div className="text-sm text-copper font-bold">
                       KEEPER MANUAL REGISTRATION
                     </div>
                     <h3 className="text-xl font-bold text-parchment mt-1">
                       ＋ 手動加入調查員
                     </h3>
-                    <p className="text-xs text-mutedText mt-1">
+                    <p className="text-s text-mutedText mt-1">
                       {addingParticipantEvent.title}
                     </p>
                   </div>
@@ -4332,16 +4332,16 @@
 
                 {/* 搜尋 */}
                 <div className="mt-5">
-                  <label className="block text-xs text-mutedText mb-2">
+                  <label className="block text-sm text-mutedText mb-2">
                     搜尋會員
                   </label>
                   <div className="flex gap-2">
                     <input type="text" placeholder="輸入會員暱稱、Email、LINE 或手機" value={memberSearch}
                       onChange={e => setMemberSearch(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') {e.preventDefault();handleSearchMembers();}}}
-                      className="flex-1 bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-sm text-parchment focus:outline-none focus:border-copper"
+                      className="flex-1 bg-void border border-borderHighlight rounded-xl px-3 py-2.5 text-s text-parchment focus:outline-none focus:border-copper"
                     />
-                    <button type="button" onClick={handleSearchMembers} disabled={searchingMembers} className="px-4 py-2 bg-copper hover:bg-copperDark text-black rounded-xl text-sm font-bold">
+                    <button type="button" onClick={handleSearchMembers} disabled={searchingMembers} className="px-4 py-2 bg-copper hover:bg-copperDark text-black rounded-xl text-s font-bold">
                       {searchingMembers ? '搜尋中...' : '搜尋'}
                     </button>
                   </div>
@@ -4360,7 +4360,7 @@
                         const alreadyJoined = addingParticipantEvent.booked_investigators.some(inv => inv.userId === result.user_id);
                         return (
                           <div key={ result.character_id || `${result.user_id}-${index}`} className="bg-void border border-borderDefault rounded-2xl p-4">
-                            <div className="flex flex-col sm:flex-row justify-between gap-4">
+                            <div className="flex flex-col s:flex-row justify-between gap-4">
                               <div>
                                 <div className="font-bold text-parchment">
                                   {result.display_name || '未設定暱稱'}
@@ -4379,7 +4379,7 @@
 
                                 {result.character_id ? (
                                   <div className="mt-3 bg-cardBg border border-borderHighlight rounded-xl p-3">
-                                    <div className="text-sm font-bold text-copper">
+                                    <div className="text-s font-bold text-copper">
                                       {result.character_name}
                                     </div>
                                     <div className="text-xs text-mutedText mt-1">
@@ -4438,52 +4438,49 @@
             ========================================== */}
           {growthRecordCharacter && (
             <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-              <div className="bg-cardBg border border-purple-700/50 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl max-h-[85vh] overflow-y-auto custom-scrollbar">
-                <div className="flex justify-between items-start pb-4 border-b border-borderDefault">
+              <div className="bg-cardBg border border-borderHighlight/50 rounded-3xl max-w-2xl w-full p-6 s:p-8 shadow-2xl max-h-[85vh] overflow-y-auto custom-scrollbar">
+                <div className="flex justify-between items-start pb-4 border-b border-borderHighlight/50">
                   <div>
-                    <div className="text-xs text-copper">
+                    <div className="text-sm text-copper">
                       調查員成長檔案
                     </div>
                     <h3 className="text-2xl font-bold text-parchment mt-1">
                       {growthRecordCharacter.name}
                     </h3>
-                    <p className="text-xs text-mutedText mt-1">
+                    <p className="text-sm text-mutedText mt-1">
                       {getCharacterTitle( growthRecordCharacter.san)}
                     </p>
                   </div>
 
-                  <button onClick={() => setGrowthRecordCharacter(null)} className="w-8 h-8 rounded-full bg-void text-mutedText hover:text-white">✕</button>
+                  <button onClick={() => setGrowthRecordCharacter(null)} className="w-10 h-10 rounded-full bg-void text-greyText hover:text-white border border-borderHighlight/50 hover:border-borderHighlight/70">✕</button>
                 </div>
 
                 <div className="mt-5 space-y-4">
                   {growthRecords.filter( record => record.character_id === growthRecordCharacter.id).length === 0 ? (
-                    <div className="p-6 text-center bg-void rounded-2xl border border-borderDefault text-sm text-mutedText">
+                    <div className="p-6 text-center bg-void rounded-2xl border border-borderHighlight/50 text-s text-greyText">
                       這名調查員目前尚無成長紀錄。
                     </div>
                   ) : ( growthRecords.filter( record => record.character_id === growthRecordCharacter.id)
                       .map(record => {
                         const recordEvent = events.find(evt => evt.id === record.event_id);
                         return (
-                          <div key={record.id} className="bg-void rounded-2xl border border-borderDefault p-5 space-y-3">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div key={record.id} className="bg-void rounded-2xl border border-borderHighlight/70 p-5 space-y-3">
+                            <div className="flex flex-col s:flex-row s:items-center justify-between gap-2">
                               <div>
-                                <div className="text-sm font-bold text-parchment">
+                                <div className="text-sm text-mutedText">
+                                  {new Date( record.created_at).toLocaleDateString('zh-TW')}
+                                </div>
+                                <div className="text-xl font-bold text-parchment mt-1">
                                   {recordEvent?.title || '未知團務'}
                                 </div>
-                                <div className="text-xs text-copper mt-0.5">
+                                <div className="text-s text-copper mt-0.5">
                                   {recordEvent?.scenario_name}
                                 </div>
                               </div>
-                              <div className="text-xs text-mutedText">
-                                {new Date( record.created_at).toLocaleDateString('zh-TW')}
-                              </div>
                             </div>
 
-                            <div className="border-t border-borderDefault pt-3">
-                              <div className="text-xs text-mutedText mb-2">
-                                Keeper 成長紀錄
-                              </div>
-                              <div className="text-sm text-parchment leading-relaxed whitespace-pre-wrap bg-cardBg p-4 rounded-xl border border-borderHighlight/50">
+                            <div className="border-borderHighlight/50 pt-2">
+                              <div className="text-lg text-parchment leading-relaxed whitespace-pre-wrap bg-cardBg p-4 rounded-xl border border-borderHighlight/50">
                                 {record.growth_note}
                               </div>
                             </div>
@@ -4493,7 +4490,7 @@
                   )}
                 </div>
 
-                <div className="mt-6 p-4 rounded-2xl bg-copper/5 border border-copper/20 text-xs text-mutedText leading-relaxed">
+                <div className="mt-6 p-4 rounded-2xl bg-copper/5 border border-copper/30 text-s text-mutedText leading-relaxed">
                   💡 完成閱讀後，請依照 Keeper 提供的成長紀錄，
                   自行更新角色卡中的 SAN、屬性、狀態、裝備或其他資料。
                 </div>
@@ -4506,7 +4503,7 @@
             ========================================== */}
           {showProfileEdit && (
             <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl">
+              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-md w-full p-6 s:p-8 shadow-2xl">
                 <div className="flex justify-between items-start mb-5">
                   <div>
                     <div className="text-xs text-copper">
@@ -4565,12 +4562,12 @@
                   </div>
 
                   <div className="flex justify-end gap-3 pt-3 border-t border-borderDefault">
-                    <button type="button" onClick={() => setShowProfileEdit(false)} className="px-4 py-2 text-sm text-mutedText hover:text-white">
+                    <button type="button" onClick={() => setShowProfileEdit(false)} className="px-4 py-2 text-s text-mutedText hover:text-white">
                       取消
                     </button>
                     <button type="submit"
                       disabled={isActionLoading('profile')}
-                      className={`px-5 py-2 rounded-xl text-sm font-bold ${
+                      className={`px-5 py-2 rounded-xl text-s font-bold ${
                         isActionLoading('profile')
                           ? 'bg-stone-800 text-stone-500 cursor-wait'
                           : 'bg-copper hover:bg-copperDark text-black'
@@ -4592,52 +4589,52 @@
             ========================================== */}
           {editingCharacter && (
             <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl">
+              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-lg w-full p-6 s:p-8 shadow-2xl">
                 <div className="flex justify-between items-start mb-5">
                   <div>
-                    <div className="text-xs text-copper">
+                    <div className="text-sm text-copper">
                       調查員檔案管理
                     </div>
-                    <h3 className="text-xl font-bold text-parchment">
+                    <h3 className="text-2xl font-bold text-parchment pt-1">
                       編輯角色卡
                     </h3>
                   </div>
-                  <button type="button" onClick={() => setEditingCharacter(null)} className="w-8 h-8 bg-void rounded-full text-mutedText hover:text-white">✕</button>
+                  <button type="button" onClick={() => setEditingCharacter(null)} className="w-10 h-10 bg-void rounded-full text-mutedText hover:text-white border border-borderHighlight/50 hover:border-borderHighlight/70 transition">✕</button>
                 </div>
 
                 <form onSubmit={handleUpdateCharacter} className="space-y-4">
                   <div>
-                    <label className="block text-xs text-mutedText mb-1">姓名</label>
-                    <input required value={editCharacterData.name} onChange={e => setEditCharacterData({...editCharacterData, name: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-parchment"/>
+                    <label className="block text-s text-greyText mb-1">姓名</label>
+                    <input required value={editCharacterData.name} onChange={e => setEditCharacterData({...editCharacterData, name: e.target.value})} className="w-full bg-void border border-borderHighlight/70 rounded-xl p-2.5 text-parchment"/>
                   </div>
                   <div>
-                    <label className="block text-xs text-mutedText mb-1">職業</label>
-                    <input required value={editCharacterData.occupation} onChange={e => setEditCharacterData({...editCharacterData, occupation: e.target.value})}  className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-parchment"/>
+                    <label className="block text-s text-greyText mb-1">職業</label>
+                    <input required value={editCharacterData.occupation} onChange={e => setEditCharacterData({...editCharacterData, occupation: e.target.value})}  className="w-full bg-void border border-borderHighlight/70 rounded-xl p-2.5 text-parchment"/>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-mutedText mb-1">目前 SAN</label>
-                      <input required type="number" min="0" max="99" value={editCharacterData.san} onChange={e => setEditCharacterData({...editCharacterData, san: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-parchment"/>
+                      <label className="block text-s text-greyText mb-1">目前 SAN</label>
+                      <input required type="number" min="0" max="99" value={editCharacterData.san} onChange={e => setEditCharacterData({...editCharacterData, san: e.target.value})} className="w-full bg-void border border-borderHighlight/70 rounded-xl p-2.5 text-parchment"/>
                     </div>
 
                     <div>
-                      <label className="block text-xs text-mutedText mb-1">最大 SAN</label>
-                      <input required type="number" min="1" max="99" value={editCharacterData.max_san} onChange={e => setEditCharacterData({...editCharacterData, max_san: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-parchment"/>
+                      <label className="block text-s text-greyText mb-1">最大 SAN</label>
+                      <input required type="number" min="1" max="99" value={editCharacterData.max_san} onChange={e => setEditCharacterData({...editCharacterData, max_san: e.target.value})} className="w-full bg-void border border-borderHighlight/70 rounded-xl p-2.5 text-parchment"/>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-mutedText mb-1">背景／特殊信物</label>
-                    <textarea rows="4" value={editCharacterData.feature} onChange={e => setEditCharacterData({...editCharacterData,feature: e.target.value})} className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-parchment resize-none"/>
+                    <label className="block text-s text-greyText mb-1">背景／特殊信物</label>
+                    <textarea rows="4" value={editCharacterData.feature} onChange={e => setEditCharacterData({...editCharacterData,feature: e.target.value})} className="w-full bg-void border border-borderHighlight/70 rounded-xl p-2.5 text-parchment resize-none"/>
                   </div>
-                  <div className="bg-void/60 border border-borderDefault rounded-xl p-3">
-                    <div className="text-xs text-mutedText">目前稱號</div>
+                  <div className="bg-void/60 border border-borderHighlight/50 rounded-xl p-3">
+                    <div className="text-sm text-greyText">目前稱號</div>
                     <div className="text-sm text-copper font-bold mt-1">{getCharacterTitle( editCharacterData.san)}</div>
                   </div>
-                  <div className="flex justify-end gap-3 pt-3 border-t border-borderDefault">
-                    <button type="button" onClick={() => setEditingCharacter(null)} className="px-4 py-2 text-sm text-mutedText hover:text-white">取消</button>
+                  <div className="flex justify-end gap-3 pt-3 border-t border-borderHighlight/50">
+                    <button type="button" onClick={() => setEditingCharacter(null)} className="px-4 py-2 text-s text-mutedText hover:text-white">取消</button>
                     <button type="submit"
                       disabled={isActionLoading(`update-char:${editingCharacter.id}`)}
-                      className={`px-5 py-2 rounded-xl text-sm font-bold ${
+                      className={`px-5 py-2 rounded-xl text-s font-bold ${
                         isActionLoading(`update-char:${editingCharacter.id}`)
                           ? 'bg-stone-800 text-stone-500 cursor-wait'
                           : 'bg-copper hover:bg-copperDark text-black'
@@ -4659,7 +4656,7 @@
             ========================================== */}
           {showGalleryForm && (
             <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl">
+              <div className="bg-cardBg border border-copper/40 rounded-3xl max-w-lg w-full p-6 s:p-8 shadow-2xl">
                 <div className="flex justify-between items-start mb-5">
                   <div>
                     <div className="text-xs text-copper">
@@ -4690,7 +4687,7 @@
                     </label>
                     <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={gallerySaving}
                       onChange={e => setGalleryFile(e.target.files?.[0] || null)}
-                      className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-sm text-mutedText"/>
+                      className="w-full bg-void border border-borderHighlight rounded-xl p-2.5 text-s text-mutedText"/>
                     <p className="text-[11px] text-mutedText mt-1">
                       JPG、PNG、WebP、AVIF，最大 5MB。網站縮圖統一顯示為 4:3。
                     </p>
@@ -4702,7 +4699,7 @@
                     <textarea required maxLength="500" rows="4" disabled={gallerySaving} value={galleryCaption}
                       onChange={e => setGalleryCaption(e.target.value)}
                       placeholder="簡短記錄這張照片的內容..."
-                      className="w-full bg-void border border-borderHighlight rounded-xl p-3 text-sm text-parchment resize-y"/>
+                      className="w-full bg-void border border-borderHighlight rounded-xl p-3 text-s text-parchment resize-y"/>
                     <div className="text-right text-[11px] text-mutedText mt-1">
                       {galleryCaption.length}
                       {' / '}
@@ -4711,12 +4708,12 @@
                   </div>
 
                   <div className="flex justify-end gap-3 pt-4 border-t border-borderDefault">
-                    <button type="button" disabled={gallerySaving} onClick={handleCloseGalleryForm} className="px-4 py-2 text-sm text-mutedText hover:text-white">
+                    <button type="button" disabled={gallerySaving} onClick={handleCloseGalleryForm} className="px-4 py-2 text-s text-mutedText hover:text-white">
                       取消
                     </button>
                     <button type="submit"
                       disabled={gallerySaving}
-                      className="px-5 py-2.5 bg-copper hover:bg-copperDark disabled:bg-stone-800 disabled:text-stone-500 text-black rounded-xl text-sm font-bold">
+                      className="px-5 py-2.5 bg-copper hover:bg-copperDark disabled:bg-stone-800 disabled:text-stone-500 text-black rounded-xl text-s font-bold">
                       {gallerySaving
                         ? '儲存中...'
                         : editingGalleryItem
@@ -4740,7 +4737,7 @@
 
               {
                 galleryItems.length > 1 && (
-                <button onClick={e => {e.stopPropagation(); showPreviousGallery();}} className="absolute left-3 sm:left-8 z-20 w-11 h-11 rounded-full bg-black/60 border border-white/20 text-white text-xl hover:bg-black">
+                <button onClick={e => {e.stopPropagation(); showPreviousGallery();}} className="absolute left-3 s:left-8 z-20 w-11 h-11 rounded-full bg-black/60 border border-white/20 text-white text-xl hover:bg-black">
                   ←
                 </button>
               )}
@@ -4751,7 +4748,7 @@
                   alt={galleryItems[galleryLightboxIndex].caption}
                   className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl"/>
                 <div className="mt-4 max-w-2xl text-center">
-                  <p className="text-sm sm:text-base text-parchment leading-relaxed">
+                  <p className="text-s s:text-base text-parchment leading-relaxed">
                     {galleryItems[galleryLightboxIndex].caption}
                   </p>
 
@@ -4765,7 +4762,7 @@
               </div>
 
               {galleryItems.length > 1 && (
-                <button onClick={e => {e.stopPropagation(); showNextGallery();}} className="absolute right-3 sm:right-8 z-20 w-11 h-11 rounded-full bg-black/60 border border-white/20 text-white text-xl hover:bg-black">
+                <button onClick={e => {e.stopPropagation(); showNextGallery();}} className="absolute right-3 s:right-8 z-20 w-11 h-11 rounded-full bg-black/60 border border-white/20 text-white text-xl hover:bg-black">
                   →
                 </button>
               )}
@@ -4773,12 +4770,12 @@
           )}
 
           <footer className="border-t border-borderHighlight/30 bg-void/90 py-6 text-center text-xs text-mutedText">
-            <div className="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="max-w-7xl mx-auto px-5 flex s:flex-row items-center justify-between gap-3">
               <span className="font-gothic tracking-wider text-parchment">
-                MISKATONIC ARCHIVES • CALL OF CTHULHU 7TH ED.
+                TRPG • CALL OF CTHULHU 7TH ED.
               </span>
               <span>
-                沉浸式 TRPG 預約管理系統
+                - design by louis
               </span>
             </div>
           </footer>
